@@ -43,6 +43,7 @@ function App() {
         }
       } catch (error) {
         console.error('Failed to restore session:', error);
+        await signOut(auth).catch(() => null);
         setUser(null);
         localStorage.removeItem('carbonGamifiedUser');
       } finally {

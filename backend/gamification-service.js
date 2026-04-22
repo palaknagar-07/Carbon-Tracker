@@ -1,4 +1,5 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
+const INDIA_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 const LEVELS = [
   { level: 1, title: 'Seedling', minXp: 0 },
@@ -40,8 +41,12 @@ function normalizeToDate(ts) {
 
 function toDayKey(dateObj) {
   const d = new Date(dateObj);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
+  if (Number.isNaN(d.getTime())) return null;
+  const istTime = new Date(d.getTime() + INDIA_OFFSET_MS);
+  const istYear = istTime.getUTCFullYear();
+  const istMonth = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+  const istDay = String(istTime.getUTCDate()).padStart(2, '0');
+  return `${istYear}-${istMonth}-${istDay}`;
 }
 
 function calculateLevel(totalXp) {
@@ -83,7 +88,7 @@ function calculateStreak(streakDoc, commuteTimestamps) {
 
   let current = 0;
   let cursor = new Date();
-  cursor.setUTCHours(0, 0, 0, 0);
+
   while (days.has(toDayKey(cursor))) {
     current += 1;
     cursor = new Date(cursor.getTime() - DAY_MS);
@@ -107,7 +112,9 @@ function checkCondition(def, context) {
     case 'carbonSavedTotalKg':
       return Number(context.totalCarbonSaved) >= Number(cond.value);
     case 'transportCount':
-      return Number(context.transportCounts?.[cond.transportMode] || 0) >= Number(cond.value);
+      // Validate transport mode exists before checking count
+      if (!cond.transportMode || !context.transportCounts) return false;
+      return Number(context.transportCounts[cond.transportMode] || 0) >= Number(cond.value);
     case 'publicTransportCount':
       return (
         Number(context.transportCounts?.bus || 0) + Number(context.transportCounts?.train || 0)
@@ -131,9 +138,17 @@ function checkBadgeUnlocks(context, unlockedIdsSet) {
 
 function awardXP({ commutePoints, challengeBonus = 0, streakBonus = 0, badgeUnlockCount = 0 }) {
   const commuteXp = Math.round(Math.max(0, Number(commutePoints) || 0));
-  const badgeBonus = badgeUnlockCount * BADGE_UNLOCK_BONUS_XP;
-  const totalXp = commuteXp + Math.max(0, challengeBonus) + Math.max(0, streakBonus) + badgeBonus;
-  return { commuteXp, streakBonus, challengeBonus, badgeBonus, totalXp };
+  const badgeBonus = Math.min(badgeUnlockCount * BADGE_UNLOCK_BONUS_XP, 500); // Cap badge bonus at 500 XP
+  const challengeBonusCapped = Math.min(Math.max(0, Number(challengeBonus) || 0), 200); // Cap challenge bonus at 200 XP
+  const streakBonusCapped = Math.min(Math.max(0, Number(streakBonus) || 0), 100); // Cap streak bonus at 100 XP
+  const totalXp = Math.min(commuteXp + challengeBonusCapped + streakBonusCapped + badgeBonus, 1000); // Cap total XP per commute at 1000
+  return { 
+    commuteXp, 
+    streakBonus: streakBonusCapped, 
+    challengeBonus: challengeBonusCapped, 
+    badgeBonus, 
+    totalXp 
+  };
 }
 
 function generateWeeklySummary({

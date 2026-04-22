@@ -15,6 +15,11 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
   const [useTracking, setUseTracking] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
 
+  const resetTransientState = useCallback(() => {
+    setError('');
+    setResult(null);
+  }, []);
+
   const transportOptions = [
     { id: 'car', name: 'Car', emoji: '🚗', carbonFactor: 192 },
     { id: 'motorcycle', name: 'Motorcycle', emoji: '🏍️', carbonFactor: 84 },
@@ -25,6 +30,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
   ];
 
   const handleRouteCalculated = useCallback((routeInfo) => {
+    setError('');
     if (!routeInfo || !routeInfo.distance || routeInfo.distance <= 0) {
       setRouteData(null);
       setDistance('');
@@ -51,7 +57,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
 
       if (response.data.success) {
         setResult(response.data);
-        onCommuteLogged(response.data, transportMode, tripData.distance);
+        onCommuteLogged(response.data, tripData.transportMode, tripData.distance);
         setIsTracking(false);
         setUseTracking(false);
         setTransportMode('');
@@ -70,7 +76,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
   const handleTripCancel = useCallback(() => {
     setIsTracking(false);
     setUseTracking(false);
-    setError('Trip tracking cancelled');
+    setError('');
   }, []);
 
   const handleSubmit = async (e) => {
@@ -126,6 +132,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
   };
 
   const formatNumber = (num) => num.toLocaleString();
+  const selectedMethod = useTracking ? 'tracking' : useMap ? 'map' : 'manual';
 
   return (
     <div className="content commute-logger">
@@ -203,9 +210,11 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
         <div className="input-section">
           <button
             type="button"
-            className={`input-button ${!useTracking ? 'active' : ''}`}
+            className={`input-button ${selectedMethod === 'manual' ? 'active' : ''}`}
             onClick={() => {
+              resetTransientState();
               setUseTracking(false);
+              setUseMap(false);
               setIsTracking(false);
               setRouteData(null);
               setDistance('');
@@ -215,12 +224,13 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
           </button>
           <button
             type="button"
-            className={`input-button ${useTracking ? 'active' : ''}`}
+            className={`input-button ${selectedMethod === 'tracking' ? 'active' : ''}`}
             onClick={() => {
               if (!transportMode) {
                 setError('Please select transport mode first');
                 return;
               }
+              resetTransientState();
               setUseTracking(true);
               setIsTracking(true);
               setUseMap(false);
@@ -232,11 +242,17 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
           </button>
           <button
             type="button"
-            className={`input-button ${useMap ? 'active' : ''}`}
+            className={`input-button ${selectedMethod === 'map' ? 'active' : ''}`}
             onClick={() => {
+              if (!transportMode) {
+                setError('Please select transport mode first');
+                return;
+              }
+              resetTransientState();
               setUseMap(true);
               setUseTracking(false);
               setIsTracking(false);
+              setRouteData(null);
               setDistance('');
             }}
           >
@@ -274,6 +290,9 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
           <div className="map-section">
             <div className="section-title">Route on map</div>
             <MapComponent onRouteCalculated={handleRouteCalculated} transportMode={transportMode} />
+            {!routeData && !error ? (
+              <div className="map-inline-hint">Select start and end points, then wait for a verified route before logging.</div>
+            ) : null}
           </div>
         )}
 

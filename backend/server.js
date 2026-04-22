@@ -10,6 +10,7 @@ const { db, admin } = require('./firebase-config');
 const { calculateCarbon, isValidTransportMode } = require('./carbon-calculator');
 const {
   DAY_MS,
+  LEVELS,
   STREAK_MILESTONES,
   calculateStreak,
   checkBadgeUnlocks,
@@ -39,6 +40,7 @@ const ROUTE_TOKEN_COLLECTION = 'route_tokens';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ORS_ALLOWED_PROFILES = new Set(['driving-car', 'cycling-regular', 'foot-walking']);
 const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY || '';
+const INDIA_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 function normalizeEmail(email) {
   return String(email || '')
@@ -399,10 +401,10 @@ function verifyRouteToken(token) {
   }
 }
 
-function startOfUtcDay(date = new Date()) {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
+function startOfIstDay(date = new Date()) {
+  const shifted = new Date(new Date(date).getTime() + INDIA_OFFSET_MS);
+  shifted.setUTCHours(0, 0, 0, 0);
+  return new Date(shifted.getTime() - INDIA_OFFSET_MS);
 }
 
 function parseToDate(value) {
@@ -480,7 +482,7 @@ async function enforceTripFrequencyAndDailyDistance(userId, proposedDistanceKm) 
   const commutesRef = db.collection('commutes');
   const now = new Date();
   const minAllowedTs = new Date(now.getTime() - MIN_TRIP_INTERVAL_SECONDS * 1000);
-  const dayStart = startOfUtcDay(now);
+  const dayStart = startOfIstDay(now);
 
   const userSnapshot = await commutesRef.where('userId', '==', userId).get();
 
@@ -852,6 +854,13 @@ app.post('/api/commute', commuteLimiter, requireAuth, async (req, res) => {
     const gamification = await processGamificationAfterCommute(userId, {
       pointsEarned: carbonCalculation.pointsEarned
     });
+    await commuteRef.set(
+      {
+        xpEarned: Number(gamification?.xp?.totalXp) || carbonCalculation.pointsEarned,
+        xpBreakdown: gamification?.xp || null
+      },
+      { merge: true }
+    );
 
     sendResponse(res, true, {
       carbonEmitted: carbonCalculation.carbonEmitted,
@@ -970,6 +979,13 @@ app.post('/api/commute/tracked', commuteLimiter, requireAuth, async (req, res) =
     const gamification = await processGamificationAfterCommute(userId, {
       pointsEarned: adjustedPoints
     });
+    await commuteRef.set(
+      {
+        xpEarned: Number(gamification?.xp?.totalXp) || adjustedPoints,
+        xpBreakdown: gamification?.xp || null
+      },
+      { merge: true }
+    );
 
     sendResponse(res, true, {
       carbonEmitted: carbonCalculation.carbonEmitted,
@@ -1089,6 +1105,13 @@ app.post('/api/commute/routed', commuteLimiter, requireAuth, async (req, res) =>
     const gamification = await processGamificationAfterCommute(userId, {
       pointsEarned: adjustedPoints
     });
+    await commuteRef.set(
+      {
+        xpEarned: Number(gamification?.xp?.totalXp) || adjustedPoints,
+        xpBreakdown: gamification?.xp || null
+      },
+      { merge: true }
+    );
 
     return sendResponse(res, true, {
       carbonEmitted: carbonCalculation.carbonEmitted,
@@ -1480,7 +1503,27 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
     });
     notifications.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-    const streak = streakDoc.exists ? streakDoc.data() : {};
+    // Recalculate streak from commute history to prevent stale data
+    const allCommuteTimestamps = [];
+    commutesSnapshot.forEach((doc) => {
+      const commuteData = serializeCommuteDoc(doc);
+      if (commuteData.timestamp) {
+        allCommuteTimestamps.push(new Date(commuteData.timestamp));
+      }
+    });
+    
+    const streakData = streakDoc.exists ? streakDoc.data() : {};
+    const recalculatedStreak = calculateStreak(streakData, allCommuteTimestamps);
+    
+    // Update streak document if it's stale
+    if (recalculatedStreak.currentStreak !== (streakData.currentStreak || 0)) {
+      await db.collection('streaks').doc(userId).set({
+        userId,
+        ...recalculatedStreak,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+    
     const rewards = rewardsDoc.exists ? rewardsDoc.data() : {};
     const level = calculateLevel(rewards.totalXp || 0);
     const latestCommuteDate = weeklyCommutes[0]?.timestamp ? new Date(weeklyCommutes[0].timestamp) : null;
@@ -1499,9 +1542,9 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
         },
         gamification: {
           streak: {
-            currentStreak: Number(streak.currentStreak) || 0,
-            bestStreak: Number(streak.bestStreak) || 0,
-            streakCalendar: streak.streakCalendar || []
+            currentStreak: Number(recalculatedStreak.currentStreak) || 0,
+            bestStreak: Number(recalculatedStreak.bestStreak) || 0,
+            streakCalendar: recalculatedStreak.streakCalendar || []
           },
           rewards: {
             totalXp: Number(rewards.totalXp) || 0,
@@ -1525,31 +1568,31 @@ app.get('/api/gamification/summary/:userId', readLimiter, requireAuth, async (re
     const { userId } = req.params;
     if (req.authUser.uid !== userId) return sendResponse(res, false, null, 'Forbidden', 403);
 
-    const [userDoc, commutesSnap, badgesSnap, rewardsDoc] = await Promise.all([
+    const [userDoc, commutesSnap, badgesSnap] = await Promise.all([
       db.collection('users').doc(userId).get(),
       db.collection('commutes').where('userId', '==', userId).get(),
-      db.collection('badges').where('userId', '==', userId).get(),
-      db.collection('rewards').doc(userId).get()
+      db.collection('badges').where('userId', '==', userId).get()
     ]);
     if (!userDoc.exists) return sendResponse(res, false, null, 'User not found', 404);
 
     const sevenDaysAgo = Date.now() - 7 * DAY_MS;
     const weekCommutes = [];
     let weekCarbonSaved = 0;
+    let weekXp = 0;
     commutesSnap.forEach((doc) => {
       const data = doc.data() || {};
       const ts = normalizeToDate(data.timestamp);
       if (ts && ts.getTime() >= sevenDaysAgo) {
         weekCommutes.push(data);
         weekCarbonSaved += Number(data.carbonSavedVsCar) || 0;
+        weekXp += Number(data.xpEarned ?? data.pointsEarned) || 0;
       }
     });
 
-    const rewards = rewardsDoc.exists ? rewardsDoc.data() : {};
     const summary = generateWeeklySummary({
       weekCommutes,
       weekCarbonSaved,
-      weekXp: rewards.xpBreakdown?.totalXp || 0,
+      weekXp,
       percentile: 80,
       unlockedBadges: badgesSnap.size
     });

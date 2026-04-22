@@ -179,24 +179,20 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
               routeToken: response.data.route.routeToken || null
             });
           }
+        } else {
+          throw new Error('Verified route could not be calculated');
         }
       } catch (error) {
         console.error('Error calculating route:', error);
-        const straightLineDistance = calculateStraightLineDistance(start, end);
         setStartPoint(start);
         setEndPoint(end);
-        setDistance(straightLineDistance);
-        setRoute([start, end]);
-
-        if (onRouteCalculated) {
-          onRouteCalculated({
-            distance: straightLineDistance,
-            startPoint: start,
-            endPoint: end,
-            route: [start, end],
-            routeToken: null
-          });
-        }
+        setDistance(0);
+        setRoute(null);
+        setAddressError(
+          error.response?.data?.message ||
+            'Could not calculate a verified route right now. Please retry, or switch to manual entry.'
+        );
+        if (onRouteCalculated) onRouteCalculated(null);
       } finally {
         setLoading(false);
       }

@@ -4,6 +4,7 @@ import api from '../api/client';
 import {
   auth,
   googleProvider,
+  signOut,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
@@ -12,6 +13,30 @@ import './LoginPage.css';
 
 const showDemoLogin =
   process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEMO_LOGIN === 'true';
+
+function getFriendlyAuthError(error) {
+  const code = String(error?.code || '');
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'Enter a valid email address.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Email or password is incorrect.';
+    case 'auth/email-already-in-use':
+      return 'That email is already registered. Try logging in instead.';
+    case 'auth/weak-password':
+      return 'Choose a stronger password with at least 6 characters.';
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in was cancelled before completion.';
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google sign-in popup. Please allow popups and try again.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a bit and try again.';
+    default:
+      return error?.response?.data?.message || error?.message || 'Authentication failed';
+  }
+}
 
 const LoginPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -28,12 +53,19 @@ const LoginPage = ({ onLogin }) => {
       throw new Error('Missing authenticated user');
     }
 
-    const response = await api.post('/api/auth/session', {
-      name: overrides.name || firebaseUser.displayName || '',
-      profilePicture: overrides.profilePicture || firebaseUser.photoURL || null
-    });
+    let response;
+    try {
+      response = await api.post('/api/auth/session', {
+        name: overrides.name || firebaseUser.displayName || '',
+        profilePicture: overrides.profilePicture || firebaseUser.photoURL || null
+      });
+    } catch (error) {
+      await signOut(auth).catch(() => null);
+      throw error;
+    }
 
     if (!response.data?.success) {
+      await signOut(auth).catch(() => null);
       throw new Error(response.data?.message || 'Could not establish authenticated session');
     }
 
@@ -64,7 +96,7 @@ const LoginPage = ({ onLogin }) => {
       await establishSession(result.user);
     } catch (error) {
       console.error('Google sign in error:', error);
-      setError(error.response?.data?.message || error.message || 'Failed to sign in with Google');
+      setError(getFriendlyAuthError(error));
     } finally {
       setLoading(false);
     }
@@ -87,7 +119,7 @@ const LoginPage = ({ onLogin }) => {
         await establishSession(userCredential.user, { name: formData.name.trim() });
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Authentication failed');
+      setError(getFriendlyAuthError(err));
     } finally {
       setLoading(false);
     }

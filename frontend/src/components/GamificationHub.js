@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './GamificationHub.css';
 
 const SHARE_TYPES = [
@@ -42,7 +42,7 @@ function drawShareCard({ type, stats, level, rank }) {
 }
 
 const GamificationHub = ({ data, weeklySummary }) => {
-  const [showCelebration, setShowCelebration] = useState(Boolean(data?.badges?.length));
+  const [showCelebration, setShowCelebration] = useState(false);
   const [shareType, setShareType] = useState('streak');
   const streak = data?.streak || {};
   const rewards = data?.rewards || {};
@@ -59,6 +59,33 @@ const GamificationHub = ({ data, weeklySummary }) => {
     });
     return out;
   }, [data]);
+
+  const latestBadgeKey = useMemo(() => {
+    const badges = data?.badges || [];
+    if (!badges.length) return null;
+    const latestBadge = [...badges].sort((a, b) => {
+      const aTime = new Date(a.unlockedAt || 0).getTime();
+      const bTime = new Date(b.unlockedAt || 0).getTime();
+      return bTime - aTime;
+    })[0];
+    if (!latestBadge?.id) return null;
+    return `${latestBadge.id}:${latestBadge.unlockedAt || 'unknown'}`;
+  }, [data]);
+
+  useEffect(() => {
+    if (!latestBadgeKey) {
+      setShowCelebration(false);
+      return;
+    }
+    const storageKey = 'carbonGamified:lastCelebratedBadge';
+    const seenBadgeKey = window.sessionStorage.getItem(storageKey);
+    if (seenBadgeKey === latestBadgeKey) {
+      setShowCelebration(false);
+      return;
+    }
+    window.sessionStorage.setItem(storageKey, latestBadgeKey);
+    setShowCelebration(true);
+  }, [latestBadgeKey]);
 
   const downloadCard = () => {
     const url = drawShareCard({ type: shareType, stats: streak, level, rank });

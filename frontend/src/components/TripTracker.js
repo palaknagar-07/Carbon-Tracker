@@ -30,6 +30,18 @@ const TripTracker = ({
   const [isHttps, setIsHttps] = useState(true);
   const intervalRef = useRef(null);
 
+  const clearTrackingSession = useCallback(() => {
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+      setWatchId(null);
+    }
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, [watchId]);
+
   const calculateDistance = useCallback((point1, point2) => {
     if (!point1 || !point2) return 0;
     
@@ -196,18 +208,10 @@ const TripTracker = ({
     return Math.max(0, score);
   }, [trackingPath, calculateDistance]);
 
-  const stopTracking = useCallback(() => {
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-    }
-    
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+  const finishTracking = useCallback((shouldSubmit) => {
+    clearTrackingSession();
 
-    if (trackingPath.length > 1) {
+    if (shouldSubmit && trackingPath.length > 1) {
       const tripData = {
         transportMode,
         distance: distance,
@@ -220,15 +224,38 @@ const TripTracker = ({
       };
 
       onTripComplete(tripData);
-    } else {
+      return;
+    }
+
+    if (shouldSubmit) {
       setTrackingError('Trip too short to validate. Please try again.');
     }
-  }, [watchId, trackingPath, distance, elapsedTime, averageSpeed, transportMode, startTime, onTripComplete, calculateValidationScore]);
+  }, [
+    clearTrackingSession,
+    trackingPath,
+    distance,
+    elapsedTime,
+    averageSpeed,
+    transportMode,
+    startTime,
+    onTripComplete,
+    calculateValidationScore
+  ]);
+
+  const stopTracking = useCallback(() => {
+    finishTracking(true);
+  }, [finishTracking]);
 
   const cancelTracking = useCallback(() => {
-    stopTracking();
+    clearTrackingSession();
+    setTrackingError('');
+    setTrackingPath([]);
+    setDistance(0);
+    setAverageSpeed(0);
+    setElapsedTime(0);
+    setStartTime(null);
     onTripCancel();
-  }, [stopTracking, onTripCancel]);
+  }, [clearTrackingSession, onTripCancel]);
 
   useEffect(() => {
     // Check if we're on HTTPS
