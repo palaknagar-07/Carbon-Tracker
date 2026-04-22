@@ -11,8 +11,6 @@ import {
 } from '../firebase';
 import './LoginPage.css';
 
-const showDemoLogin =
-  process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEMO_LOGIN === 'true';
 
 function getFriendlyAuthError(error) {
   const code = String(error?.code || '');
@@ -131,14 +129,7 @@ const LoginPage = ({ onLogin }) => {
     setFormData({ email: '', password: '', name: '' });
   };
 
-  const useDemo = () => {
-    setFormData({
-      email: 'demo@test.com',
-      password: 'Demo123!',
-      name: 'Demo User'
-    });
-  };
-
+  
   return (
     <div className="login-page">
       <div className="login-container">
@@ -227,12 +218,7 @@ const LoginPage = ({ onLogin }) => {
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
             </button>
 
-            {showDemoLogin ? (
-              <button type="button" className="btn-link demo-btn" onClick={useDemo}>
-                Use demo account
-              </button>
-            ) : null}
-          </div>
+                      </div>
         </div>
       </div>
     </div>

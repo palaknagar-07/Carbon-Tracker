@@ -119,7 +119,7 @@ function getShareCardModel({ type, streak, level, rank, userName, profileStats }
       ctaTitle: 'Show your rank',
       ctaBody: 'Leaderboard cards are built to spark healthy competition and social proof.',
       ribbon: rank ? `Top ${rank} energy` : 'Ranking in progress',
-      orbLabel: 'Board Position'
+      orbLabel: rank ? `#${rank}` : 'Board Position'
     },
     level: {
       variant: 'level',

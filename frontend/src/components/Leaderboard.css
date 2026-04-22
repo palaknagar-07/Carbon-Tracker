@@ -22,6 +22,75 @@
   color: var(--text-muted);
 }
 
+/* Your Rank Card */
+.your-rank-card {
+  background: linear-gradient(135deg, #f0f9f0 0%, #e8f5e8 100%);
+  border: 2px solid #4caf50;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);
+}
+
+.your-rank-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.your-rank-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+}
+
+.your-rank-label {
+  font-size: 14px;
+  color: #2e7d32;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.your-rank-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1b5e20;
+  line-height: 1;
+}
+
+.your-rank-message {
+  flex: 1;
+}
+
+.your-rank-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2e7d32;
+  margin-bottom: 0.5rem;
+}
+
+.your-rank-subtitle {
+  font-size: 14px;
+  color: #4caf50;
+  line-height: 1.4;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .your-rank-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .your-rank-number {
+    font-size: 2rem;
+  }
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem 1.5rem;
@@ -103,6 +172,16 @@
   background: rgba(116, 198, 157, 0.18);
 }
 
+.current-user {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(76, 175, 80, 0.08) 100%);
+  border: 2px solid #4caf50;
+  position: relative;
+}
+
+.current-user:hover {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.25) 0%, rgba(76, 175, 80, 0.15) 100%);
+}
+
 .cell {
   display: flex;
   align-items: center;
@@ -139,6 +218,17 @@
   font-weight: 500;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.you-indicator {
+  background: #4caf50;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .leaderboard-footer {

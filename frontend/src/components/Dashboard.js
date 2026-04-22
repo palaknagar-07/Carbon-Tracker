@@ -174,6 +174,7 @@ const Dashboard = ({ user, onLogout }) => {
   const greetingEmoji = currentHour < 12 ? '☀️' : currentHour < 18 ? '🌿' : '🌙';
   const displayName = user?.name || 'Eco Hero';
   const tagline = MOTIVATIONAL_TAGLINES[(tipIndex + 1) % MOTIVATIONAL_TAGLINES.length];
+  const currentStreak = Number(gamificationData?.streak?.currentStreak) || 0;
 
   if (loading) {
     return (
@@ -228,7 +229,7 @@ const Dashboard = ({ user, onLogout }) => {
           className={`tab ${activeTab === 'gamification' ? 'active' : ''}`}
           onClick={() => setActiveTab('gamification')}
         >
-          Rewards
+          My Profile
         </button>
       </div>
 
@@ -248,6 +249,10 @@ const Dashboard = ({ user, onLogout }) => {
               <h2>{`${greetingPrefix}, ${displayName} ${greetingEmoji}`}</h2>
               <p>{tagline}</p>
               <span className="welcome-cta">Choose any method below to continue your eco streak.</span>
+              <div className="welcome-streak-pill">
+                <span className="welcome-streak-icon">🔥</span>
+                <span>{currentStreak} day streak</span>
+              </div>
             </div>
             <div className="welcome-badge" aria-hidden="true">🌎</div>
           </section>
@@ -286,6 +291,11 @@ const Dashboard = ({ user, onLogout }) => {
               <div className="stat-label">Points earned</div>
               <div className="stat-value">{formatNumber(userStats.totalPoints)}</div>
               <div className="stat-unit">eco points</div>
+            </div>
+            <div className="stat-card stat-card-streak">
+              <div className="stat-label">Current streak</div>
+              <div className="stat-value">{formatNumber(currentStreak)}</div>
+              <div className="stat-unit">consecutive days</div>
             </div>
           </div>
 
@@ -352,7 +362,7 @@ const Dashboard = ({ user, onLogout }) => {
             <CommuteLogger user={user} onCommuteLogged={handleCommuteLogged} />
           )}
 
-          {activeTab === 'leaderboard' && <Leaderboard />}
+          {activeTab === 'leaderboard' && <Leaderboard gamificationData={gamificationData} user={user} />}
           {activeTab === 'gamification' && (
             <GamificationHub
               data={gamificationData}

@@ -82,15 +82,6 @@
   color: var(--primary);
 }
 
-.demo-btn {
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.demo-btn:hover {
-  color: var(--primary-light);
-}
 
 @media (max-width: 480px) {
   .login-card {

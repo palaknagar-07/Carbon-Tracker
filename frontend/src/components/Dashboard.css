@@ -130,6 +130,24 @@
   color: var(--text-muted);
 }
 
+.welcome-streak-pill {
+  margin-top: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(45, 106, 79, 0.12);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.welcome-streak-icon {
+  font-size: 0.95rem;
+}
+
 .welcome-badge {
   width: 56px;
   height: 56px;
@@ -224,6 +242,15 @@
 .dash-stats .stat-card:hover {
   border-color: var(--accent);
   box-shadow: 0 8px 24px rgba(45, 106, 79, 0.08);
+}
+
+.dash-stats .stat-card-streak {
+  background: linear-gradient(135deg, #fdf5e8 0%, #fff8ef 100%);
+  border-color: rgba(201, 168, 76, 0.35);
+}
+
+.dash-stats .stat-card-streak .stat-value {
+  color: #9b6a17;
 }
 
 .dash-stats .stat-label {
