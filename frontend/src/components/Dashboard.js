@@ -354,7 +354,12 @@ const Dashboard = ({ user, onLogout }) => {
 
           {activeTab === 'leaderboard' && <Leaderboard />}
           {activeTab === 'gamification' && (
-            <GamificationHub data={gamificationData} weeklySummary={weeklySummary} />
+            <GamificationHub
+              data={gamificationData}
+              weeklySummary={weeklySummary}
+              userName={displayName}
+              profileStats={userStats}
+            />
           )}
         </>
       )}
