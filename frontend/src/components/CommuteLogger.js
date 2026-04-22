@@ -44,7 +44,6 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
         distance: tripData.distance,
         duration: tripData.duration,
         averageSpeed: tripData.averageSpeed,
-        validationScore: tripData.validationScore,
         path: tripData.path,
         startTime: tripData.startTime,
         endTime: tripData.endTime
@@ -87,12 +86,28 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
       setLoading(false);
       return;
     }
+    if (useMap && !routeData?.routeToken) {
+      setError('Map validation requires a verified route. Please recalculate route and try again.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      const response = await api.post('/api/commute', {
-        transportMode,
-        distance: finalDistance
-      });
+      const endpoint = useMap ? '/api/commute/routed' : '/api/commute';
+      const payload = useMap
+        ? {
+            transportMode,
+            distance: finalDistance,
+            route: routeData?.route,
+            startPoint: routeData?.startPoint,
+            endPoint: routeData?.endPoint,
+            routeToken: routeData?.routeToken
+          }
+        : {
+            transportMode,
+            distance: finalDistance
+          };
+      const response = await api.post(endpoint, payload);
 
       if (response.data.success) {
         setResult(response.data);
@@ -114,6 +129,52 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
 
   return (
     <div className="content commute-logger">
+      <div className="method-guide-card" role="note" aria-label="Choose one commute logging method">
+        <div className="method-guide-header">
+          <h3>🚲 Choose the Best Way to Log Your Commute</h3>
+          <p>Use whichever method fits your trip best — you are always in control.</p>
+        </div>
+
+        <div className="method-guide-grid">
+          <article className="method-guide-item">
+            <div className="method-guide-icon" aria-hidden="true">✍️</div>
+            <div>
+              <h4>1. Manual Entry</h4>
+              <p className="method-guide-copy">
+                Best for regular routes like home-college, home-office, and school-home.
+                If you already know the distance, enter it directly.
+              </p>
+            </div>
+          </article>
+
+          <article className="method-guide-item">
+            <div className="method-guide-icon" aria-hidden="true">🗺️</div>
+            <div>
+              <h4>2. Maps Route</h4>
+              <p className="method-guide-copy">
+                Best for intercity travel, new destinations, or one-time trips.
+                Pick From and To locations and route distance is calculated for you.
+              </p>
+            </div>
+          </article>
+
+          <article className="method-guide-item">
+            <div className="method-guide-icon" aria-hidden="true">📍</div>
+            <div>
+              <h4>3. GPS Live Tracking</h4>
+              <p className="method-guide-copy">
+                Best for real-time trips, daily commute challenges, and extra rewards.
+                Just start tracking and the app auto-calculates your distance.
+              </p>
+            </div>
+          </article>
+        </div>
+
+        <p className="method-guide-footer">
+          Choose any one method below to continue. You are always in control of how you log your commute.
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} className="commute-form">
         <div className="section-title">Transport mode</div>
         <div className="transport-grid">
@@ -221,7 +282,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
         <button
           type="submit"
           className="btn submit-btn"
-          disabled={loading || (useMap && (!routeData || !routeData.distance))}
+          disabled={loading || (useMap && (!routeData || !routeData.distance || !routeData.routeToken))}
         >
           {loading ? 'Logging…' : 'Log commute'}
         </button>
@@ -245,6 +306,20 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
               <span className="result-label">New total points</span>
               <span className="result-value total">{formatNumber(result.newTotalPoints)}</span>
             </div>
+            {result.validationScore ? (
+              <div className="result-item">
+                <span className="result-label">Validation score</span>
+                <span className="result-value">{result.validationScore}/100</span>
+              </div>
+            ) : null}
+            {result.bonusMultiplier > 1 ? (
+              <div className="result-item">
+                <span className="result-label">Validation bonus</span>
+                <span className="result-value success">
+                  +{Math.round((result.bonusMultiplier - 1) * 100)}%
+                </span>
+              </div>
+            ) : null}
           </div>
           <p className="result-foot">Nice work — keep choosing lower-carbon options.</p>
         </div>

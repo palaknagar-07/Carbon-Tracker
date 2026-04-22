@@ -1,0 +1,92 @@
+.gami-root {
+  display: grid;
+  gap: 1rem;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 28px rgba(19, 58, 44, 0.12);
+  padding: 1rem;
+}
+
+.streak-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.streak-grid strong {
+  font-size: 1.6rem;
+  color: var(--primary);
+  display: block;
+}
+
+.calendar-row {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.day-chip {
+  font-size: 0.72rem;
+  background: rgba(82, 183, 136, 0.18);
+  border: 1px solid rgba(82, 183, 136, 0.42);
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+}
+
+.level-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #ddebe4;
+  overflow: hidden;
+}
+
+.level-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2d6a4f, #52b788);
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.6rem;
+}
+
+.badge-item {
+  border-radius: 10px;
+  padding: 0.65rem;
+  border: 1px solid var(--neutral-border);
+  background: #fff;
+}
+
+.badge-icon {
+  font-size: 1.3rem;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.celebration-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.celebration-body {
+  width: min(92vw, 420px);
+  border-radius: 14px;
+  background: white;
+  padding: 1rem;
+}

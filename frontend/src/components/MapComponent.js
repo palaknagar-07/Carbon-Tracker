@@ -175,7 +175,8 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
               distance: routeDistance,
               startPoint: start,
               endPoint: end,
-              route: routeCoords
+              route: routeCoords,
+              routeToken: response.data.route.routeToken || null
             });
           }
         }
@@ -192,7 +193,8 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
             distance: straightLineDistance,
             startPoint: start,
             endPoint: end,
-            route: [start, end]
+            route: [start, end],
+            routeToken: null
           });
         }
       } finally {

@@ -10,6 +10,9 @@ import {
 } from '../firebase';
 import './LoginPage.css';
 
+const showDemoLogin =
+  process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEMO_LOGIN === 'true';
+
 const LoginPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
@@ -192,9 +195,11 @@ const LoginPage = ({ onLogin }) => {
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
             </button>
 
-            <button type="button" className="btn-link demo-btn" onClick={useDemo}>
-              Use demo account
-            </button>
+            {showDemoLogin ? (
+              <button type="button" className="btn-link demo-btn" onClick={useDemo}>
+                Use demo account
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

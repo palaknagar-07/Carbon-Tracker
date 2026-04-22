@@ -98,6 +98,109 @@
   margin-top: 0;
 }
 
+.welcome-hero {
+  background: linear-gradient(135deg, #e8f7ee 0%, #e9f3fb 100%);
+  border: 1px solid #d5ebdd;
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(45, 106, 79, 0.1);
+  padding: 1.2rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.welcome-copy h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.welcome-copy p {
+  margin: 0.4rem 0 0;
+  color: var(--text-dark);
+  font-size: 0.95rem;
+}
+
+.welcome-cta {
+  margin-top: 0.55rem;
+  display: inline-block;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.welcome-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex: 0 0 auto;
+}
+
+.insight-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+
+.insight-card {
+  border: 1px solid var(--neutral-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 6px 20px rgba(31, 41, 55, 0.06);
+}
+
+.tip-card {
+  border-color: #dceee3;
+}
+
+.facts-card {
+  border-color: #d9e8f6;
+}
+
+.insight-kicker {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.insight-text {
+  margin: 0;
+  color: var(--text-dark);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.fact-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.fade-in {
+  animation: fadeInsight 0.45s ease;
+}
+
+@keyframes fadeInsight {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .dash-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -177,6 +280,20 @@
 }
 
 @media (max-width: 768px) {
+  .welcome-hero {
+    padding: 1rem;
+  }
+
+  .welcome-copy h2 {
+    font-size: 1.2rem;
+  }
+
+  .welcome-badge {
+    width: 46px;
+    height: 46px;
+    font-size: 22px;
+  }
+
   .dash-header {
     flex-direction: column;
     align-items: stretch;

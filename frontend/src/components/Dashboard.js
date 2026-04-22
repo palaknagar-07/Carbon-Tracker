@@ -3,7 +3,28 @@ import api from '../api/client';
 import CommuteLogger from './CommuteLogger';
 import Leaderboard from './Leaderboard';
 import TripDetails from './TripDetails';
+import GamificationHub from './GamificationHub';
 import './Dashboard.css';
+
+const MOTIVATIONAL_TAGLINES = [
+  'Start logging for a better future.',
+  'Every commute counts toward a greener planet.',
+  'Your small actions create big environmental change.'
+];
+
+const ECO_TIPS = [
+  'Use public transport once a week to reduce emissions.',
+  'Walking short distances improves health and helps the planet.',
+  'Carpooling saves fuel and lowers traffic congestion.',
+  'Cycling daily reduces your carbon footprint significantly.'
+];
+
+const ECO_FACTS = [
+  'Transportation contributes nearly 20% of global CO2 emissions.',
+  'One person switching to cycling can save hundreds of kg of CO2 yearly.',
+  'Trees absorb around 22 kg of CO2 per year on average.',
+  'Shared rides reduce road congestion and emissions.'
+];
 
 function parseCommuteDate(c) {
   const t = c?.timestamp;
@@ -33,6 +54,10 @@ const Dashboard = ({ user, onLogout }) => {
   const [tripDetailsData, setTripDetailsData] = useState(null);
   const [tripTransportMode, setTripTransportMode] = useState('');
   const [tripDistance, setTripDistance] = useState(0);
+  const [tipIndex, setTipIndex] = useState(0);
+  const [factIndices, setFactIndices] = useState([0, 1]);
+  const [gamificationData, setGamificationData] = useState(null);
+  const [weeklySummary, setWeeklySummary] = useState(null);
 
   const fetchUserStats = useCallback(async () => {
     if (!user?.userId) {
@@ -80,6 +105,11 @@ const Dashboard = ({ user, onLogout }) => {
         todayEmittedKg,
         weekSavedKg
       });
+      setGamificationData(userData.gamification || null);
+      const summaryRes = await api.get(`/api/gamification/summary/${encodeURIComponent(user.userId)}`);
+      if (summaryRes.data?.success) {
+        setWeeklySummary(summaryRes.data.summary || null);
+      }
     } catch (error) {
       console.error('Error fetching user stats:', error);
       const msg =
@@ -96,6 +126,27 @@ const Dashboard = ({ user, onLogout }) => {
   useEffect(() => {
     fetchUserStats();
   }, [fetchUserStats]);
+
+  useEffect(() => {
+    const todaySeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    const initialTip = todaySeed % ECO_TIPS.length;
+    const firstFact = todaySeed % ECO_FACTS.length;
+    const secondFact = (firstFact + 1) % ECO_FACTS.length;
+    setTipIndex(initialTip);
+    setFactIndices([firstFact, secondFact]);
+  }, []);
+
+  useEffect(() => {
+    const rotate = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % ECO_TIPS.length);
+      setFactIndices((prev) => {
+        const nextFirst = (prev[0] + 1) % ECO_FACTS.length;
+        const nextSecond = (nextFirst + 1) % ECO_FACTS.length;
+        return [nextFirst, nextSecond];
+      });
+    }, 12000);
+    return () => clearInterval(rotate);
+  }, []);
 
   
   const handleCommuteLogged = (tripData = null, transportMode = '', distance = 0) => {
@@ -118,6 +169,11 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   const formatNumber = (num) => num.toLocaleString();
+  const currentHour = new Date().getHours();
+  const greetingPrefix = currentHour < 12 ? 'Good Morning' : currentHour < 18 ? 'Good Afternoon' : 'Good Evening';
+  const greetingEmoji = currentHour < 12 ? '☀️' : currentHour < 18 ? '🌿' : '🌙';
+  const displayName = user?.name || 'Eco Hero';
+  const tagline = MOTIVATIONAL_TAGLINES[(tipIndex + 1) % MOTIVATIONAL_TAGLINES.length];
 
   if (loading) {
     return (
@@ -167,6 +223,13 @@ const Dashboard = ({ user, onLogout }) => {
         >
           Leaderboard
         </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'gamification' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gamification')}
+        >
+          Rewards
+        </button>
       </div>
 
       {fetchError && (
@@ -180,6 +243,33 @@ const Dashboard = ({ user, onLogout }) => {
 
       {activeTab === 'dashboard' && (
         <div className="content dashboard-panel">
+          <section className="welcome-hero">
+            <div className="welcome-copy">
+              <h2>{`${greetingPrefix}, ${displayName} ${greetingEmoji}`}</h2>
+              <p>{tagline}</p>
+              <span className="welcome-cta">Choose any method below to continue your eco streak.</span>
+            </div>
+            <div className="welcome-badge" aria-hidden="true">🌎</div>
+          </section>
+
+          <section className="insight-row">
+            <article className="insight-card tip-card">
+              <div className="insight-kicker">Daily Sustainability Tip</div>
+              <p key={`tip-${tipIndex}`} className="insight-text fade-in">{ECO_TIPS[tipIndex]}</p>
+            </article>
+            <article className="insight-card facts-card">
+              <div className="insight-kicker">Eco Facts</div>
+              <div className="fact-list">
+                <p key={`fact-a-${factIndices[0]}`} className="insight-text fade-in">
+                  {ECO_FACTS[factIndices[0]]}
+                </p>
+                <p key={`fact-b-${factIndices[1]}`} className="insight-text fade-in">
+                  {ECO_FACTS[factIndices[1]]}
+                </p>
+              </div>
+            </article>
+          </section>
+
           <div className="section-title">Overview</div>
           <div className="stats-grid dash-stats">
             <div className="stat-card">
@@ -263,6 +353,9 @@ const Dashboard = ({ user, onLogout }) => {
           )}
 
           {activeTab === 'leaderboard' && <Leaderboard />}
+          {activeTab === 'gamification' && (
+            <GamificationHub data={gamificationData} weeklySummary={weeklySummary} />
+          )}
         </>
       )}
     </div>

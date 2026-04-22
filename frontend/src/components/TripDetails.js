@@ -138,6 +138,12 @@ const TripDetails = ({ tripData, onBack, transportMode, distance, userStats, onN
                   Self-reported distance. Enable GPS tracking for validation bonuses.
                 </p>
               )}
+              {tripData.validationMethod === 'map_route' && (
+                <p className="validation-method">
+                  <span className="method-badge">Map Route</span>
+                  Route-planned validation with moderate confidence and bonus points.
+                </p>
+              )}
             </div>
           </div>
         </div>

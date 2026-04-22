@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './TripTracker.css';
 
+const SPEED_LIMITS = {
+  walking: { min: 2, max: 8 },
+  bicycle: { min: 8, max: 30 },
+  motorcycle: { min: 20, max: 120 },
+  car: { min: 15, max: 140 },
+  bus: { min: 15, max: 80 },
+  train: { min: 30, max: 160 }
+};
+
 const TripTracker = ({ 
   transportMode, 
   onTripComplete, 
@@ -21,16 +30,6 @@ const TripTracker = ({
   const [isHttps, setIsHttps] = useState(true);
   const intervalRef = useRef(null);
 
-  // Speed limits for different transport modes (km/h)
-  const SPEED_LIMITS = {
-    walking: { min: 2, max: 8 },
-    bicycle: { min: 8, max: 30 },
-    motorcycle: { min: 20, max: 120 },
-    car: { min: 15, max: 140 },
-    bus: { min: 15, max: 80 },
-    train: { min: 30, max: 160 }
-  };
-
   const calculateDistance = useCallback((point1, point2) => {
     if (!point1 || !point2) return 0;
     
@@ -50,7 +49,39 @@ const TripTracker = ({
   const validateSpeed = useCallback((speed, mode) => {
     const limits = SPEED_LIMITS[mode] || SPEED_LIMITS.car;
     return speed >= limits.min && speed <= limits.max;
-  }, [SPEED_LIMITS]);
+  }, []);
+
+  const verifyLocationAccess = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationPermission('denied');
+      setTrackingError('GPS is not supported by your browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setLocationPermission('granted');
+        setTrackingError('');
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationPermission('denied');
+          setTrackingError('GPS permission denied. Please enable location access in your browser settings.');
+        } else if (error.code === error.TIMEOUT) {
+          setLocationPermission('prompt');
+          setTrackingError('GPS request timed out. Please try again with a better signal.');
+        } else {
+          setLocationPermission('prompt');
+          setTrackingError('GPS position unavailable. Please check device location services and retry.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
@@ -59,8 +90,12 @@ const TripTracker = ({
     }
 
     setTrackingError('');
-    setStartTime(Date.now());
+    const trackingStartedAt = Date.now();
+    setStartTime(trackingStartedAt);
     setTrackingPath([]);
+    setDistance(0);
+    setAverageSpeed(0);
+    setElapsedTime(0);
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -90,8 +125,13 @@ const TripTracker = ({
               return prev; // Don't add this point
             }
 
-            setDistance(prevDistance => prevDistance + segmentDistance);
-            setAverageSpeed(speed);
+            setDistance((prevDistance) => {
+              const nextDistance = prevDistance + segmentDistance;
+              const totalTimeHours = (newPoint.timestamp - trackingStartedAt) / (1000 * 3600);
+              const computedAverageSpeed = totalTimeHours > 0 ? nextDistance / totalTimeHours : speed;
+              setAverageSpeed(computedAverageSpeed);
+              return nextDistance;
+            });
           }
 
           return newPath;
@@ -127,9 +167,9 @@ const TripTracker = ({
 
     // Update elapsed time
     intervalRef.current = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      setElapsedTime(Math.floor((Date.now() - trackingStartedAt) / 1000));
     }, 1000);
-  }, [transportMode, calculateDistance, validateSpeed, startTime]);
+  }, [transportMode, calculateDistance, validateSpeed]);
 
   const calculateValidationScore = useCallback(() => {
     let score = 100;
@@ -197,18 +237,30 @@ const TripTracker = ({
     // Check location permission status when component mounts
     if (navigator.geolocation && navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        setLocationPermission(result.state);
+        if (result.state === 'denied') {
+          // Some browsers can report stale denied state; verify actively.
+          verifyLocationAccess();
+        } else {
+          setLocationPermission(result.state);
+        }
         
         // Listen for permission changes
         result.addEventListener('change', () => {
-          setLocationPermission(result.state);
+          if (result.state === 'denied') {
+            verifyLocationAccess();
+          } else {
+            setLocationPermission(result.state);
+          }
         });
       }).catch(() => {
         // Fallback if permissions API is not supported
         setLocationPermission('prompt');
       });
+    } else if (navigator.geolocation) {
+      // Browsers without Permissions API: actively verify once.
+      verifyLocationAccess();
     }
-  }, []);
+  }, [verifyLocationAccess]);
 
   useEffect(() => {
     return () => {
@@ -307,27 +359,7 @@ const TripTracker = ({
                     type="button" 
                     className="btn retry-btn"
                     onClick={() => {
-                      console.log('Requesting location permission...');
-                      // Try to request permission again
-                      if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            console.log('Location permission granted:', position);
-                            setLocationPermission('granted');
-                          },
-                          (error) => {
-                            console.log('Location permission denied:', error);
-                            setLocationPermission('denied');
-                          },
-                          {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
-                          }
-                        );
-                      } else {
-                        console.log('Geolocation not supported');
-                      }
+                      verifyLocationAccess();
                     }}
                   >
                     Retry Location Access
@@ -349,33 +381,7 @@ const TripTracker = ({
                     type="button" 
                     className="btn primary-btn"
                     onClick={() => {
-                      console.log('Requesting location permission...');
-                      // Request location permission with immediate prompt
-                      if (navigator.geolocation) {
-                        // First try to get current position to trigger permission prompt
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            console.log('Location permission granted:', position);
-                            setLocationPermission('granted');
-                            // Force a re-render to show the tracking interface
-                            setTimeout(() => {
-                              // This will cause the component to re-render with granted permission
-                            }, 100);
-                          },
-                          (error) => {
-                            console.log('Location permission denied:', error);
-                            setLocationPermission('denied');
-                          },
-                          {
-                            enableHighAccuracy: true,
-                            timeout: 15000,
-                            maximumAge: 0
-                          }
-                        );
-                      } else {
-                        console.log('Geolocation not supported');
-                        alert('GPS is not supported by your browser. Please use manual entry.');
-                      }
+                      verifyLocationAccess();
                     }}
                   >
                     Enable GPS Tracking
