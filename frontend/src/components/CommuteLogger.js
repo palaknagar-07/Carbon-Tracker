@@ -71,7 +71,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
     } finally {
       setLoading(false);
     }
-  }, [transportMode, onCommuteLogged]);
+  }, [onCommuteLogged]);
 
   const handleTripCancel = useCallback(() => {
     setIsTracking(false);
