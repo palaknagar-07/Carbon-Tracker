@@ -5,6 +5,7 @@ import {
   Marker,
   Popup,
   Polyline,
+  Tooltip,
   useMapEvents,
   useMap
 } from 'react-leaflet';
@@ -33,8 +34,46 @@ const INDIA_MAX_BOUNDS = [
 
 const NOMINATIM_DELAY_MS = 1100;
 
+const createMarkerIcon = (markerType) =>
+  L.divIcon({
+    className: `route-marker route-marker-${markerType}`,
+    html: '<span class="route-marker-dot" aria-hidden="true"></span>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -12]
+  });
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isValidCoordinatePair(point) {
+  return (
+    Array.isArray(point) &&
+    point.length === 2 &&
+    Number.isFinite(Number(point[0])) &&
+    Number.isFinite(Number(point[1]))
+  );
+}
+
+function getRouteErrorMessage(error) {
+  const rawMessage = String(error?.response?.data?.message || error?.message || '').trim();
+  if (!rawMessage) {
+    return 'Unable to calculate the verified route right now. You can still log the trip with fallback distance.';
+  }
+
+  if (
+    rawMessage.includes('Routing response missing geometry') ||
+    rawMessage.includes('Could not find routable point')
+  ) {
+    return 'One of the selected points is too far from a mapped road. Tap closer to a road or use the address search.';
+  }
+
+  if (rawMessage.includes('Request failed with status code 404')) {
+    return 'Route verification could not find a valid road path for one of these points. Try a nearby road or use the address search.';
+  }
+
+  return rawMessage;
 }
 
 async function geocodeIndia(query) {
@@ -88,7 +127,9 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
   const [fromQuery, setFromQuery] = useState('');
   const [toQuery, setToQuery] = useState('');
   const [addressError, setAddressError] = useState('');
+  const [routeWarning, setRouteWarning] = useState('');
   const mapRef = useRef();
+  const previousTransportModeRef = useRef(transportMode);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -129,25 +170,41 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
 
   const calculateRouteBetween = useCallback(
     async (start, end) => {
-      if (!start || !end) return;
+      if (!isValidCoordinatePair(start) || !isValidCoordinatePair(end)) {
+        setAddressError('Select valid From and To coordinates before calculating a route.');
+        if (onRouteCalculated) onRouteCalculated(null);
+        return;
+      }
 
       setLoading(true);
       setAddressError('');
+      setRouteWarning('');
+      console.log('Origin:', start);
+      console.log('Destination:', end);
       try {
-        if (!transportMode) {
-          const straightLineDistance = calculateStraightLineDistance(start, end);
+        const straightLineDistance = calculateStraightLineDistance(start, end);
+        const buildFallbackRoute = (warningMessage) => {
+          console.warn('Fallback to straight-line distance');
+          console.log('Route Distance:', straightLineDistance);
           setStartPoint(start);
           setEndPoint(end);
           setDistance(straightLineDistance);
           setRoute([start, end]);
+          setRouteWarning(warningMessage);
           if (onRouteCalculated) {
             onRouteCalculated({
               distance: straightLineDistance,
               startPoint: start,
               endPoint: end,
-              route: [start, end]
+              route: [start, end],
+              routeToken: null,
+              isFallback: true
             });
           }
+        };
+
+        if (!transportMode) {
+          buildFallbackRoute('Transport mode missing, so using straight-line distance as a temporary fallback.');
           return;
         }
 
@@ -164,11 +221,13 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
         if (response.data?.success && response.data?.route?.coordinates?.length > 1) {
           const routeCoords = response.data.route.coordinates;
           const routeDistance = Number(response.data.route.distanceKm) || 0;
+          console.log('Route Distance:', routeDistance);
 
           setStartPoint(start);
           setEndPoint(end);
           setRoute(routeCoords);
           setDistance(routeDistance);
+          setRouteWarning('');
 
           if (onRouteCalculated) {
             onRouteCalculated({
@@ -176,7 +235,8 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
               startPoint: start,
               endPoint: end,
               route: routeCoords,
-              routeToken: response.data.route.routeToken || null
+              routeToken: response.data.route.routeToken || null,
+              isFallback: false
             });
           }
         } else {
@@ -184,15 +244,26 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
         }
       } catch (error) {
         console.error('Error calculating route:', error);
+        const fallbackDistance = calculateStraightLineDistance(start, end);
+        console.log('Route Distance:', fallbackDistance);
         setStartPoint(start);
         setEndPoint(end);
-        setDistance(0);
-        setRoute(null);
-        setAddressError(
-          error.response?.data?.message ||
-            'Could not calculate a verified route right now. Please retry, or switch to manual entry.'
+        setDistance(fallbackDistance);
+        setRoute([start, end]);
+        setRouteWarning(
+          'Verified road distance is unavailable right now. Showing straight-line distance as a fallback.'
         );
-        if (onRouteCalculated) onRouteCalculated(null);
+        setAddressError(getRouteErrorMessage(error));
+        if (onRouteCalculated) {
+          onRouteCalculated({
+            distance: fallbackDistance,
+            startPoint: start,
+            endPoint: end,
+            route: [start, end],
+            routeToken: null,
+            isFallback: true
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -210,19 +281,20 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
       click: (e) => {
         const { lat, lng } = e.latlng;
         setAddressError('');
+        setRouteWarning('');
+        const selectedLocation = [lat, lng];
 
         if (!startPoint) {
-          setStartPoint([lat, lng]);
+          setStartPoint(selectedLocation);
           setEndPoint(null);
           setRoute(null);
           setDistance(0);
           if (onRouteCalculated) onRouteCalculated(null);
         } else if (!endPoint) {
-          const end = [lat, lng];
-          setEndPoint(end);
-          calculateRouteBetween(startPoint, end);
+          setEndPoint(selectedLocation);
+          calculateRouteBetween(startPoint, selectedLocation);
         } else {
-          setStartPoint([lat, lng]);
+          setStartPoint(selectedLocation);
           setEndPoint(null);
           setRoute(null);
           setDistance(0);
@@ -272,11 +344,14 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
       setRoute(null);
       setDistance(0);
       setAddressError('');
+      setRouteWarning('');
       if (onRouteCalculated) onRouteCalculated(null);
     }
   };
 
   useEffect(() => {
+    if (previousTransportModeRef.current === transportMode) return;
+    previousTransportModeRef.current = transportMode;
     if (startPoint && endPoint) {
       calculateRouteBetween(startPoint, endPoint);
     }
@@ -290,6 +365,7 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
     setFromQuery('');
     setToQuery('');
     setAddressError('');
+    setRouteWarning('');
     if (onRouteCalculated) onRouteCalculated(null);
   };
 
@@ -357,6 +433,7 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
             </button>
           </div>
         </div>
+        {routeWarning ? <div className="map-route-warning">{routeWarning}</div> : null}
 
         <div className="map-leaflet-frame">
           <MapContainer
@@ -378,9 +455,12 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
             {boundsPositions && <FitRouteBounds positions={boundsPositions} />}
 
             {startPoint && (
-              <Marker position={startPoint}>
+              <Marker position={startPoint} icon={createMarkerIcon('from')}>
+                <Tooltip direction="top" offset={[0, -14]} permanent>
+                  From
+                </Tooltip>
                 <Popup>
-                  <strong>Start</strong>
+                  <strong>From</strong>
                   <br />
                   {startPoint[0].toFixed(5)}, {startPoint[1].toFixed(5)}
                 </Popup>
@@ -388,9 +468,12 @@ const MapComponent = ({ onRouteCalculated, transportMode }) => {
             )}
 
             {endPoint && (
-              <Marker position={endPoint}>
+              <Marker position={endPoint} icon={createMarkerIcon('to')}>
+                <Tooltip direction="top" offset={[0, -14]} permanent>
+                  To
+                </Tooltip>
                 <Popup>
-                  <strong>End</strong>
+                  <strong>To</strong>
                   <br />
                   {distance > 0 ? `${distance.toFixed(2)} km` : ''}
                 </Popup>

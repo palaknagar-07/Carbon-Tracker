@@ -69,6 +69,17 @@
   color: var(--primary);
 }
 
+.map-route-warning {
+  margin-bottom: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  background: #fff6dd;
+  border: 1px solid #f0c36b;
+  color: #8a5a00;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .map-actions {
   display: flex;
   gap: 0.8rem;
@@ -118,6 +129,42 @@
 
 .leaflet-popup-content-wrapper {
   border-radius: 8px;
+}
+
+.route-marker {
+  background: transparent;
+  border: 0;
+}
+
+.route-marker-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22);
+}
+
+.route-marker-from .route-marker-dot {
+  background: #2d6a4f;
+}
+
+.route-marker-to .route-marker-dot {
+  background: #d64545;
+}
+
+.leaflet-tooltip {
+  border-radius: 999px;
+  border: 0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  padding: 0.28rem 0.55rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: rgba(15, 23, 42, 0.08);
 }
 
 @media (max-width: 768px) {

@@ -37,6 +37,7 @@ const MAX_DAILY_DISTANCE_KM = Number(process.env.MAX_DAILY_DISTANCE_KM) || 300;
 const MAP_ROUTE_TOKEN_TTL_SECONDS = Number(process.env.MAP_ROUTE_TOKEN_TTL_SECONDS) || 900;
 const ROUTE_TOKEN_SECRET = String(process.env.ROUTE_TOKEN_SECRET || process.env.OPENROUTESERVICE_API_KEY || '').trim();
 const ROUTE_TOKEN_COLLECTION = 'route_tokens';
+const ORS_ROUTE_SNAP_RADIUS_METERS = 5000;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ORS_ALLOWED_PROFILES = new Set(['driving-car', 'cycling-regular', 'foot-walking']);
@@ -116,7 +117,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '1mb' }));
 
 const rateLimitHandler = (req, res) => {
   res.status(429).json({
@@ -1308,6 +1309,32 @@ function calculateDistanceFromCoords(point1, point2) {
   return R * c;
 }
 
+function calculateRouteDistanceKmFromCoordinates(routeCoords) {
+  if (!Array.isArray(routeCoords) || routeCoords.length < 2) return 0;
+
+  let totalKm = 0;
+  for (let i = 1; i < routeCoords.length; i++) {
+    const previous = routeCoords[i - 1];
+    const current = routeCoords[i];
+
+    if (
+      !Array.isArray(previous) ||
+      !Array.isArray(current) ||
+      previous.length < 2 ||
+      current.length < 2
+    ) {
+      continue;
+    }
+
+    totalKm += calculateDistanceFromCoords(
+      { latitude: Number(previous[1]), longitude: Number(previous[0]) },
+      { latitude: Number(current[1]), longitude: Number(current[0]) }
+    );
+  }
+
+  return totalKm;
+}
+
 app.post('/api/routes/directions', readLimiter, requireAuth, async (req, res) => {
   try {
     const profile = String(req.body.profile || '').trim();
@@ -1337,35 +1364,74 @@ app.post('/api/routes/directions', readLimiter, requireAuth, async (req, res) =>
     }
 
     const orsResponse = await axios.post(
-      `https://api.openrouteservice.org/v2/directions/${profile}`,
+      `https://api.openrouteservice.org/v2/directions/${profile}/geojson`,
       {
         coordinates: [
           [Number(start[1]), Number(start[0])],
           [Number(end[1]), Number(end[0])]
         ],
-        format: 'geojson',
-        units: 'km'
+        units: 'km',
+        radiuses: [ORS_ROUTE_SNAP_RADIUS_METERS, ORS_ROUTE_SNAP_RADIUS_METERS]
       },
       {
         headers: {
           'Authorization': apiKey,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, application/geo+json'
         },
         timeout: 20000
       }
     );
 
     const feature = orsResponse.data?.features?.[0];
-    const routeCoordsRaw = feature?.geometry?.coordinates;
-    const routeDistanceMeters = feature?.properties?.segments?.[0]?.distance;
+    const fallbackRoute = orsResponse.data?.routes?.[0];
+    const routeCoordsRaw =
+      feature?.geometry?.coordinates ??
+      fallbackRoute?.geometry?.coordinates ??
+      fallbackRoute?.geometry;
+    const routeDistanceRaw =
+      feature?.properties?.summary?.distance ??
+      fallbackRoute?.summary?.distance ??
+      feature?.properties?.segments?.reduce(
+        (total, segment) => total + (Number(segment?.distance) || 0),
+        0
+      ) ??
+      fallbackRoute?.segments?.reduce(
+        (total, segment) => total + (Number(segment?.distance) || 0),
+        0
+      );
 
     if (!Array.isArray(routeCoordsRaw) || routeCoordsRaw.length < 2) {
+      console.error('Directions geometry missing:', {
+        profile,
+        start,
+        end,
+        topLevelKeys: Object.keys(orsResponse.data || {}),
+        hasFeatures: Array.isArray(orsResponse.data?.features),
+        hasRoutes: Array.isArray(orsResponse.data?.routes),
+        featureGeometryType: feature?.geometry?.type || null,
+        fallbackGeometryType: Array.isArray(fallbackRoute?.geometry?.coordinates)
+          ? 'LineString'
+          : typeof fallbackRoute?.geometry
+      });
       return sendResponse(res, false, null, 'Routing response missing geometry', 502);
     }
 
     const coordinates = routeCoordsRaw.map((coord) => [Number(coord[1]), Number(coord[0])]);
-    const distanceKm = Number(routeDistanceMeters) / 1000;
-    const normalizedDistance = Number.isFinite(distanceKm) ? Number(distanceKm.toFixed(3)) : null;
+    const geometryDistanceKm = calculateRouteDistanceKmFromCoordinates(routeCoordsRaw);
+    const numericRouteDistance = Number(routeDistanceRaw);
+    const summaryDistanceKm = Number.isFinite(numericRouteDistance)
+      ? numericRouteDistance > geometryDistanceKm * 20
+        ? numericRouteDistance / 1000
+        : numericRouteDistance
+      : null;
+    const trustedDistanceKm =
+      Number.isFinite(summaryDistanceKm) && summaryDistanceKm > 0
+        ? summaryDistanceKm
+        : geometryDistanceKm;
+    const normalizedDistance = Number.isFinite(trustedDistanceKm)
+      ? Number(trustedDistanceKm.toFixed(3))
+      : null;
     const routeTokenPayload =
       normalizedDistance != null
         ? {
@@ -1394,6 +1460,15 @@ app.post('/api/routes/directions', readLimiter, requireAuth, async (req, res) =>
         null,
         'Routing service is rate-limiting requests. Please wait a moment and try again.',
         429
+      );
+    }
+    if (status === 404) {
+      return sendResponse(
+        res,
+        false,
+        null,
+        'One of the selected points is too far from a mapped road. Please tap closer to a road or use the address search.',
+        422
       );
     }
     console.error('Directions route error:', status || '', upstreamMessage || error.message);

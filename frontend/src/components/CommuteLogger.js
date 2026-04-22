@@ -92,15 +92,16 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
       setLoading(false);
       return;
     }
-    if (useMap && !routeData?.routeToken) {
+    if (useMap && !routeData) {
       setError('Map validation requires a verified route. Please recalculate route and try again.');
       setLoading(false);
       return;
     }
 
     try {
-      const endpoint = useMap ? '/api/commute/routed' : '/api/commute';
-      const payload = useMap
+      const shouldUseVerifiedRoute = useMap && !!routeData?.routeToken;
+      const endpoint = shouldUseVerifiedRoute ? '/api/commute/routed' : '/api/commute';
+      const payload = shouldUseVerifiedRoute
         ? {
             transportMode,
             distance: finalDistance,
@@ -289,9 +290,23 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
         ) : (
           <div className="map-section">
             <div className="section-title">Route on map</div>
+            <div className="map-route-guide" role="note" aria-label="How to use map route">
+              <h4>How to use Map Route</h4>
+              <ol className="map-route-guide-list">
+                <li>Select your transport mode first.</li>
+                <li>Tap the map once to set <strong>From</strong>, then tap again to set <strong>To</strong>.</li>
+                <li>Tap close to a road or use the address search for better route accuracy.</li>
+                <li>Wait for the route distance to appear before logging the trip.</li>
+              </ol>
+              <p className="map-route-guide-note">
+                If a point is too far from a mapped road, route verification may fail and the app will use a fallback distance.
+              </p>
+            </div>
             <MapComponent onRouteCalculated={handleRouteCalculated} transportMode={transportMode} />
             {!routeData && !error ? (
               <div className="map-inline-hint">Select start and end points, then wait for a verified route before logging.</div>
+            ) : routeData?.isFallback ? (
+              <div className="map-inline-hint">Verified routing is temporarily unavailable, so this trip will use fallback straight-line distance.</div>
             ) : null}
           </div>
         )}
@@ -301,7 +316,7 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
         <button
           type="submit"
           className="btn submit-btn"
-          disabled={loading || (useMap && (!routeData || !routeData.distance || !routeData.routeToken))}
+          disabled={loading || (useMap && (!routeData || !routeData.distance))}
         >
           {loading ? 'Logging…' : 'Log commute'}
         </button>
