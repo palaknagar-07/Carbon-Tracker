@@ -1,5 +1,9 @@
 import React from 'react';
 import './TripDetails.css';
+import {
+  calculateEnvironmentalImpact,
+  getTripImpactMessaging
+} from '../utils/impactEquivalents';
 
 const TripDetails = ({ tripData, onBack, transportMode, distance, userStats, onNavigateToLeaderboard, onLogAnotherTrip }) => {
   const formatNumber = (num) => num.toLocaleString();
@@ -46,19 +50,8 @@ const TripDetails = ({ tripData, onBack, transportMode, distance, userStats, onN
     return names[mode] || 'Car';
   };
 
-  const calculateEnvironmentalImpact = (carbonSaved) => {
-    const treesEquivalent = carbonSaved / 21; // 21 kg CO2 per tree per year
-    const carHoursOffRoad = carbonSaved / 0.192; // 192g CO2 per km for average car
-    const lightBulbHours = (carbonSaved * 1000) / 0.011; // 11g CO2 per hour for LED bulb
-    
-    return {
-      treesEquivalent,
-      carHoursOffRoad,
-      lightBulbHours
-    };
-  };
-
   const impact = calculateEnvironmentalImpact(tripData.carbonSavedVsCar);
+  const impactMessage = getTripImpactMessaging(transportMode);
 
   return (
     <div className="trip-details">
@@ -193,11 +186,8 @@ const TripDetails = ({ tripData, onBack, transportMode, distance, userStats, onN
       </div>
 
       <div className="encouragement">
-        <h3>Great Choice! 🌍</h3>
-        <p>
-          By choosing {getTransportName(transportMode).toLowerCase()}, you've made a positive impact on the environment. 
-          Every eco-friendly trip contributes to a healthier planet. Keep up the great work!
-        </p>
+        <h3>{impactMessage.title}</h3>
+        <p>{impactMessage.message}</p>
       </div>
 
       <div className="action-buttons">

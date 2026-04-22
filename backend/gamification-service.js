@@ -49,6 +49,12 @@ function toDayKey(dateObj) {
   return `${istYear}-${istMonth}-${istDay}`;
 }
 
+function calculateLevelProgress(currentLevel, totalLevels = LEVELS.length) {
+  const safeTotalLevels = Math.max(1, Number(totalLevels) || LEVELS.length);
+  const safeCurrentLevel = Math.max(0, Math.min(Number(currentLevel) || 0, safeTotalLevels));
+  return Math.round((safeCurrentLevel / safeTotalLevels) * 100);
+}
+
 function calculateLevel(totalXp) {
   const xp = Math.max(0, Number(totalXp) || 0);
   let current = LEVELS[0];
@@ -56,15 +62,14 @@ function calculateLevel(totalXp) {
     if (xp >= LEVELS[i].minXp) current = LEVELS[i];
   }
   const next = LEVELS.find((l) => l.level === current.level + 1) || null;
-  const progress = next
-    ? Math.max(0, Math.min(100, Math.round(((xp - current.minXp) / (next.minXp - current.minXp)) * 100)))
-    : 100;
+  const progress = calculateLevelProgress(current.level, LEVELS.length);
   return {
     level: current.level,
     levelTitle: current.title,
     currentXp: xp,
     nextLevelXp: next ? next.minXp : current.minXp,
-    progressPercent: progress
+    progressPercent: progress,
+    totalLevels: LEVELS.length
   };
 }
 
@@ -151,6 +156,36 @@ function awardXP({ commutePoints, challengeBonus = 0, streakBonus = 0, badgeUnlo
   };
 }
 
+function getCommuteXp(data = {}) {
+  if (Number.isFinite(Number(data.xpEarned))) {
+    return Math.max(0, Number(data.xpEarned));
+  }
+  if (Number.isFinite(Number(data?.xpBreakdown?.totalXp))) {
+    return Math.max(0, Number(data.xpBreakdown.totalXp));
+  }
+
+  return awardXP({ commutePoints: Math.max(0, Number(data.pointsEarned) || 0) }).totalXp;
+}
+
+function aggregateWeeklyStats(commutes = [], totalXpCap = Number.POSITIVE_INFINITY) {
+  const safeTotalXpCap = Number.isFinite(Number(totalXpCap))
+    ? Math.max(0, Number(totalXpCap))
+    : Number.POSITIVE_INFINITY;
+  const totals = commutes.reduce(
+    (acc, commute) => {
+      acc.weekCarbonSaved += Math.max(0, Number(commute?.carbonSavedVsCar) || 0);
+      acc.weekXp += getCommuteXp(commute);
+      return acc;
+    },
+    { weekCarbonSaved: 0, weekXp: 0 }
+  );
+
+  return {
+    weekCarbonSaved: totals.weekCarbonSaved,
+    weekXp: Math.min(totals.weekXp, safeTotalXpCap)
+  };
+}
+
 function generateWeeklySummary({
   weekCommutes = [],
   weekCarbonSaved = 0,
@@ -176,10 +211,13 @@ module.exports = {
   STREAK_MILESTONES,
   BADGE_DEFINITIONS,
   BADGE_UNLOCK_BONUS_XP,
+  aggregateWeeklyStats,
   calculateStreak,
   checkBadgeUnlocks,
   awardXP,
   calculateLevel,
+  calculateLevelProgress,
+  getCommuteXp,
   generateWeeklySummary,
   normalizeToDate
 };

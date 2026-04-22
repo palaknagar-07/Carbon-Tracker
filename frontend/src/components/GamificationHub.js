@@ -8,6 +8,8 @@ const SHARE_TYPES = [
   { id: 'level', label: 'Level Card' }
 ];
 
+const DEFAULT_TOTAL_LEVELS = 5;
+
 const CARD_THEME = {
   forest: '#1a3a2a',
   moss: '#2d5a3d',
@@ -39,6 +41,15 @@ function formatCompactNumber(value) {
   return String(Math.round(numeric * 10) / 10);
 }
 
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Number(value) || 0));
+}
+
+function getRankDisplay(rank) {
+  const numericRank = Number(rank);
+  return Number.isFinite(numericRank) && numericRank > 0 ? `#${numericRank}` : 'Unranked';
+}
+
 function getShareCardModel({ type, streak, level, rank, userName, profileStats }) {
   const totalCarbonSaved = Number(profileStats?.totalCarbonSaved) || 0;
   const totalPoints = Number(profileStats?.totalPoints) || 0;
@@ -46,16 +57,23 @@ function getShareCardModel({ type, streak, level, rank, userName, profileStats }
   const currentStreak = Number(streak?.currentStreak) || 0;
   const bestStreak = Number(streak?.bestStreak) || 0;
   const currentXp = Number(level?.currentXp) || 0;
-  const progressPercent = Math.max(1, Number(level?.progressPercent) || 0);
-  const nextLevelXp = Number(level?.nextLevelXp) || currentXp || 1;
+  const currentLevel = Math.max(1, Number(level?.level) || 1);
+  const totalLevels = Math.max(
+    DEFAULT_TOTAL_LEVELS,
+    currentLevel,
+    Number(level?.totalLevels) || 0
+  );
+  const progressPercent = clampPercent(level?.progressPercent);
   const user = userName || 'Eco Commuter';
+  const rankDisplay = getRankDisplay(rank);
+  const hasRank = rankDisplay !== 'Unranked';
 
   const base = {
     userName: user,
     date: formatShortDate(),
     progressPercent,
-    progressText: `${currentXp} / ${nextLevelXp} XP`,
-    progressLabel: 'Progress to next level'
+    progressText: `Level ${currentLevel} / ${totalLevels}`,
+    progressLabel: 'Level completion'
   };
 
   const cardByType = {
@@ -63,7 +81,7 @@ function getShareCardModel({ type, streak, level, rank, userName, profileStats }
       variant: 'streak',
       icon: '🔥',
       eyebrow: 'Consistency unlocked',
-      titleTop: `${currentStreak} Day`,
+      titleTop: `${currentStreak}-Day`,
       titleAccent: 'Streak',
       badge: `${level.levelTitle} · Daily Rhythm`,
       heroValue: `${currentStreak}`,
@@ -85,65 +103,120 @@ function getShareCardModel({ type, streak, level, rank, userName, profileStats }
       eyebrow: 'Planet-positive impact',
       titleTop: 'Carbon',
       titleAccent: 'Saved',
-      badge: `${level.levelTitle} · Climate Impact`,
-      heroValue: `${totalCarbonSaved.toFixed(1)}`,
-      heroUnit: 'kg CO2 avoided',
-      summary: 'This is the environmental value behind your daily transport decisions.',
+      badge: `${level.levelTitle} · Climate`,
+      heroValue: `${formatCompactNumber(totalCarbonSaved.toFixed(1))}`,
+      heroUnit: 'lifetime kg CO2 saved',
+      summary: 'Your lifetime carbon savings versus driving.',
       stats: [
         { value: `${Math.round(totalCarbonSaved / 21)}`, label: 'Tree Eq.' },
-        { value: formatCompactNumber(totalPoints), label: 'Eco Points' },
+        { value: formatCompactNumber(totalPoints), label: 'Points' },
         { value: formatCompactNumber(tripsLogged), label: 'Trips' }
       ],
       progressText: `${totalCarbonSaved.toFixed(1)} kg lifetime`,
-      progressLabel: 'Lifetime impact',
+      progressLabel: 'Lifetime total',
       ctaTitle: 'Let the numbers speak',
-      ctaBody: 'This format turns your commute history into a premium climate-impact snapshot.',
-      ribbon: 'Impact compounds quietly',
-      orbLabel: 'Lifetime Saved'
+      ctaBody: 'A clean snapshot of your lifetime climate impact.',
+      ribbon: 'Lifetime impact',
+      orbLabel: 'Lifetime'
     },
     leaderboard: {
       variant: 'leaderboard',
       icon: '🏆',
-      eyebrow: 'Achievement unlocked',
-      titleTop: rank ? `Rank #${rank}` : 'Leaderboard',
-      titleAccent: rank ? 'Momentum' : 'Climb',
-      badge: rank ? `${level.levelTitle} · Top Performer` : `${level.levelTitle} · Rising Fast`,
-      heroValue: rank ? `#${rank}` : '↑',
-      heroUnit: rank ? 'current rank' : 'climbing',
-      summary: 'A competitive card should feel sharper, faster, and more status-driven.',
+      eyebrow: 'Leaderboard position',
+      titleTop: 'Leaderboard',
+      titleAccent: 'Rank',
+      badge: hasRank ? `${level.levelTitle} · Ranked Player` : `${level.levelTitle} · Ranking Pending`,
+      heroValue: rankDisplay,
+      heroUnit: hasRank ? 'your current leaderboard rank' : 'log more trips to get ranked',
+      summary: hasRank
+        ? `You are currently ranked ${rankDisplay} on the leaderboard. Keep logging verified eco trips to climb higher.`
+        : 'Your rank will appear here once you start climbing the leaderboard with more logged trips.',
       stats: [
         { value: formatCompactNumber(totalPoints), label: 'Points' },
         { value: `${currentStreak}`, label: 'Streak' },
-        { value: `${totalCarbonSaved.toFixed(1)}kg`, label: 'CO2 Saved' }
+        { value: formatCompactNumber(tripsLogged), label: 'Trips' }
       ],
       ctaTitle: 'Show your rank',
-      ctaBody: 'Leaderboard cards are built to spark healthy competition and social proof.',
-      ribbon: rank ? `Top ${rank} energy` : 'Ranking in progress',
-      orbLabel: rank ? `#${rank}` : 'Board Position'
+      ctaBody: 'This card is designed to spotlight your current leaderboard position at a glance.',
+      ribbon: hasRank ? `Current position ${rankDisplay}` : 'Ranking in progress',
+      orbLabel: 'Leaderboard'
     },
     level: {
       variant: 'level',
       icon: '✨',
       eyebrow: 'Growth milestone',
-      titleTop: level.levelTitle || 'Seedling',
-      titleAccent: `Level ${level.level || 1}`,
-      badge: `${level.levelTitle} · Growth Mode`,
-      heroValue: formatCompactNumber(currentXp),
-      heroUnit: 'xp collected',
-      summary: 'A level card should feel aspirational and polished, almost like an award certificate.',
+      titleTop: 'Level',
+      titleAccent: `${level.level || 1}`,
+      badge: `${level.levelTitle} · Growth`,
+      heroValue: `${level.level || 1}`,
+      heroUnit: level.levelTitle || 'Seedling',
+      summary: `Level ${level.level || 1} with ${formatCompactNumber(currentXp)} XP total.`,
       stats: [
-        { value: `${level.level || 1}`, label: 'Level' },
+        { value: formatCompactNumber(currentXp), label: 'XP' },
         { value: `${currentStreak}`, label: 'Streak' },
         { value: formatCompactNumber(totalPoints), label: 'Points' }
       ],
       ctaTitle: 'Celebrate the climb',
-      ctaBody: 'This version puts progression first so the milestone feels earned.',
-      ribbon: 'Growth mode active',
-      orbLabel: 'XP Bank'
+      ctaBody: 'A focused snapshot of your current level progress.',
+      ribbon: 'Growth active',
+      orbLabel: level.levelTitle || 'Growth'
     }
   };
 
   return { ...base, ...cardByType[type] };
+}
+
+function setFittedFont(ctx, text, {
+  maxWidth,
+  maxFontSize,
+  minFontSize,
+  fontFamily,
+  fontWeight = '400',
+  fontStyle = 'normal'
+}) {
+  let fontSize = maxFontSize;
+  while (fontSize > minFontSize) {
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    if (ctx.measureText(String(text)).width <= maxWidth) {
+      return fontSize;
+    }
+    fontSize -= 2;
+  }
+  ctx.font = `${fontStyle} ${fontWeight} ${minFontSize}px ${fontFamily}`;
+  return minFontSize;
+}
+
+function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let currentLine = '';
+
+  words.forEach((word) => {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth || !currentLine) {
+      currentLine = candidate;
+      return;
+    }
+    lines.push(currentLine);
+    currentLine = word;
+  });
+
+  if (currentLine) lines.push(currentLine);
+
+  const finalLines = lines.slice(0, maxLines).map((line, index, arr) => {
+    if (index !== arr.length - 1 || lines.length <= maxLines) return line;
+    let trimmed = line;
+    while (trimmed.length > 0 && ctx.measureText(`${trimmed}…`).width > maxWidth) {
+      trimmed = trimmed.slice(0, -1);
+    }
+    return `${trimmed}…`;
+  });
+
+  finalLines.forEach((line, index) => {
+    ctx.fillText(line, x, y + index * lineHeight);
+  });
+
+  return finalLines.length;
 }
 
 function drawBotanical(ctx, variant) {
@@ -238,12 +311,18 @@ function drawOrnament(ctx, model) {
       ctx.strokeRect(720 + i * 28, 262 + i * 28, 186 - i * 56, 300 - i * 56);
     }
     ctx.fillStyle = CARD_THEME.goldLight;
-    ctx.font = '700 120px "Playfair Display", Georgia, serif';
+    setFittedFont(ctx, model.heroValue, {
+      maxWidth: 220,
+      maxFontSize: 118,
+      minFontSize: 74,
+      fontFamily: '"Playfair Display", Georgia, serif',
+      fontWeight: '700'
+    });
     ctx.textAlign = 'center';
     ctx.fillText(model.heroValue, 835, 396);
     ctx.fillStyle = CARD_THEME.textDim;
     ctx.font = '500 18px "DM Sans", Arial';
-    ctx.fillText(model.orbLabel.toUpperCase(), 835, 438);
+    drawWrappedText(ctx, model.orbLabel.toUpperCase(), 835, 438, 130, 20, 2);
   } else {
     const halo = ctx.createLinearGradient(720, 250, 980, 520);
     halo.addColorStop(0, 'rgba(201,168,76,0.1)');
@@ -272,13 +351,13 @@ function drawSummaryBlock(ctx, model) {
     ctx.fillRect(110, 612, 860, 82);
     ctx.fillStyle = CARD_THEME.cream;
     ctx.font = '400 24px "DM Sans", Arial';
-    ctx.fillText(model.summary, 140, 662);
+    drawWrappedText(ctx, model.summary, 140, 652, 800, 28, 2);
   } else if (model.variant === 'leaderboard') {
     ctx.fillStyle = CARD_THEME.gold;
     ctx.fillRect(110, 620, 280, 4);
     ctx.fillStyle = CARD_THEME.cream;
     ctx.font = '400 22px "DM Sans", Arial';
-    ctx.fillText(model.summary, 110, 668);
+    drawWrappedText(ctx, model.summary, 110, 660, 540, 26, 3);
   } else if (model.variant === 'level') {
     ctx.fillStyle = 'rgba(201,168,76,0.1)';
     ctx.beginPath();
@@ -288,11 +367,11 @@ function drawSummaryBlock(ctx, model) {
     ctx.stroke();
     ctx.fillStyle = CARD_THEME.cream;
     ctx.font = '400 22px "DM Sans", Arial';
-    ctx.fillText(model.summary, 138, 661);
+    drawWrappedText(ctx, model.summary, 138, 646, 290, 24, 3);
   } else {
     ctx.fillStyle = CARD_THEME.cream;
     ctx.font = 'italic 400 26px "Playfair Display", Georgia, serif';
-    ctx.fillText(model.summary, 110, 668);
+    drawWrappedText(ctx, model.summary, 110, 652, 520, 30, 3);
   }
   ctx.restore();
 }
@@ -307,7 +386,13 @@ function drawStats(ctx, model) {
       ctx.roundRect(x, 728, 255, 98, 16);
       ctx.fill();
       ctx.fillStyle = CARD_THEME.white;
-      ctx.font = '700 48px "Playfair Display", Georgia, serif';
+      setFittedFont(ctx, String(stat.value), {
+        maxWidth: 200,
+        maxFontSize: 48,
+        minFontSize: 30,
+        fontFamily: '"Playfair Display", Georgia, serif',
+        fontWeight: '700'
+      });
       ctx.fillText(String(stat.value), x + 26, 784);
       ctx.fillStyle = CARD_THEME.textDim;
       ctx.font = '500 18px "DM Sans", Arial';
@@ -319,7 +404,13 @@ function drawStats(ctx, model) {
     model.stats.forEach((stat, index) => {
       const statX = 110 + index * 290;
       ctx.fillStyle = CARD_THEME.white;
-      ctx.font = '700 56px "Playfair Display", Georgia, serif';
+      setFittedFont(ctx, String(stat.value), {
+        maxWidth: 220,
+        maxFontSize: 56,
+        minFontSize: 28,
+        fontFamily: '"Playfair Display", Georgia, serif',
+        fontWeight: '700'
+      });
       ctx.fillText(String(stat.value), statX, statTop);
       ctx.fillStyle = CARD_THEME.textDim;
       ctx.font = '500 18px "DM Sans", Arial';
@@ -413,14 +504,34 @@ function drawShareCard(model) {
   ctx.fillText(model.eyebrow.toUpperCase(), 110, 230);
 
   ctx.fillStyle = CARD_THEME.cream;
-  ctx.font = '700 82px "Playfair Display", Georgia, serif';
+  setFittedFont(ctx, model.titleTop, {
+    maxWidth: 520,
+    maxFontSize: 82,
+    minFontSize: 54,
+    fontFamily: '"Playfair Display", Georgia, serif',
+    fontWeight: '700'
+  });
   ctx.fillText(model.titleTop, 110, 330);
   ctx.fillStyle = CARD_THEME.goldLight;
-  ctx.font = 'italic 700 82px "Playfair Display", Georgia, serif';
+  setFittedFont(ctx, model.titleAccent, {
+    maxWidth: 520,
+    maxFontSize: 82,
+    minFontSize: 54,
+    fontFamily: '"Playfair Display", Georgia, serif',
+    fontWeight: '700',
+    fontStyle: 'italic'
+  });
   ctx.fillText(model.titleAccent, 110, 414);
 
   ctx.fillStyle = CARD_THEME.leaf;
-  ctx.font = 'italic 42px "Playfair Display", Georgia, serif';
+  setFittedFont(ctx, model.userName, {
+    maxWidth: 430,
+    maxFontSize: 42,
+    minFontSize: 26,
+    fontFamily: '"Playfair Display", Georgia, serif',
+    fontWeight: '400',
+    fontStyle: 'italic'
+  });
   ctx.fillText(model.userName, 110, 478);
 
   ctx.fillStyle = 'rgba(201,168,76,0.12)';
@@ -438,7 +549,13 @@ function drawShareCard(model) {
   ctx.beginPath();
   ctx.arc(pillX + 24, pillY + 23, 6, 0, Math.PI * 2);
   ctx.fill();
-  ctx.font = '500 20px "DM Sans", Arial';
+  setFittedFont(ctx, model.badge.toUpperCase(), {
+    maxWidth: pillW - 56,
+    maxFontSize: 20,
+    minFontSize: 14,
+    fontFamily: '"DM Sans", Arial',
+    fontWeight: '500'
+  });
   ctx.fillText(model.badge.toUpperCase(), pillX + 42, pillY + 29);
 
   ctx.fillStyle = CARD_THEME.textDim;
@@ -482,7 +599,7 @@ function drawShareCard(model) {
   ctx.fillText(model.ctaTitle, 110, 1002);
   ctx.fillStyle = CARD_THEME.cream;
   ctx.font = '400 24px "DM Sans", Arial';
-  ctx.fillText(model.ctaBody, 110, 1038);
+  drawWrappedText(ctx, model.ctaBody, 110, 1018, 650, 28, 2);
 
   ctx.fillStyle = CARD_THEME.textDim;
   ctx.font = '500 18px "DM Sans", Arial';
@@ -503,6 +620,7 @@ const GamificationHub = ({ data, weeklySummary, userName, profileStats }) => {
         level: 1,
         levelTitle: 'Seedling',
         progressPercent: 0,
+        totalLevels: DEFAULT_TOTAL_LEVELS,
         currentXp: 0,
         nextLevelXp: 300
       },
@@ -607,7 +725,7 @@ const GamificationHub = ({ data, weeklySummary, userName, profileStats }) => {
       <section className="glass-card">
         <h3>Rewards & XP</h3>
         <div className="level-line">
-          Level {level.level} - {level.levelTitle}
+          Level {level.level} / {Math.max(DEFAULT_TOTAL_LEVELS, Number(level.totalLevels) || 0, Number(level.level) || 1)} - {level.levelTitle}
         </div>
         <div className="level-track">
           <div className="level-fill" style={{ width: `${level.progressPercent || 0}%` }} />

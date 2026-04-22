@@ -49,6 +49,7 @@
 .level-fill {
   height: 100%;
   background: linear-gradient(90deg, #2d6a4f, #52b788);
+  transition: width 0.7s ease;
 }
 
 .badge-grid {
@@ -81,7 +82,7 @@
 
 .share-card-preview {
   position: relative;
-  width: min(100%, 450px);
+  width: min(100%, 560px);
   aspect-ratio: 1 / 1;
   margin: 0 auto 1rem;
   border-radius: 6px;
@@ -265,12 +266,14 @@
   margin-bottom: 0.35rem;
   font-family: 'Playfair Display', serif;
   color: #f5f0e8;
+  min-width: 0;
 }
 
 .share-headline span,
 .share-headline em {
   font-size: clamp(1.9rem, 4vw, 2.45rem);
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .share-headline em {
@@ -291,6 +294,7 @@
   align-items: center;
   gap: 0.45rem;
   align-self: flex-start;
+  max-width: 100%;
   background: rgba(201, 168, 76, 0.12);
   border: 1px solid rgba(201, 168, 76, 0.3);
   border-radius: 999px;
@@ -311,6 +315,7 @@
   letter-spacing: 0.09rem;
   text-transform: uppercase;
   color: #c9a84c;
+  overflow-wrap: anywhere;
 }
 
 .share-card-ribbon {
@@ -329,6 +334,7 @@
   gap: 1rem;
   min-height: 7rem;
   margin-bottom: 0.8rem;
+  min-width: 0;
 }
 
 .share-hero-panel--streak {
@@ -339,7 +345,7 @@
   background: linear-gradient(135deg, rgba(245,240,232,0.06), rgba(106,173,120,0.08));
   border: 1px solid rgba(245,240,232,0.08);
   border-radius: 1.1rem;
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 0.95rem;
 }
 
 .share-hero-panel--leaderboard {
@@ -351,13 +357,15 @@
   background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(245,240,232,0.04));
   border: 1px solid rgba(201,168,76,0.18);
   border-radius: 1rem;
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 0.95rem;
 }
 
 .share-hero-copy {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .share-hero-value {
@@ -365,6 +373,7 @@
   font-size: clamp(2.1rem, 5vw, 3.4rem);
   line-height: 0.95;
   color: #ffffff;
+  overflow-wrap: anywhere;
 }
 
 .share-hero-unit {
@@ -390,13 +399,17 @@
   font-size: 0.58rem;
   letter-spacing: 0.12rem;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
 }
 
 .share-hero-panel--carbon .share-hero-mark {
   border-radius: 1.1rem;
-  min-width: 7rem;
-  min-height: 4.8rem;
+  min-width: 5.8rem;
+  min-height: 4rem;
   background: rgba(201,168,76,0.12);
+  font-size: 0.5rem;
+  letter-spacing: 0.08rem;
 }
 
 .share-hero-panel--leaderboard .share-hero-mark {
@@ -409,14 +422,17 @@
 
 .share-hero-panel--level .share-hero-mark {
   border-radius: 1rem;
-  min-width: 6.6rem;
-  min-height: 5rem;
+  min-width: 5.7rem;
+  min-height: 4.1rem;
   background: rgba(245,240,232,0.05);
+  font-size: 0.5rem;
+  letter-spacing: 0.08rem;
 }
 
 .share-summary-block {
   margin-bottom: 0.9rem;
   color: #f5f0e8;
+  overflow-wrap: anywhere;
 }
 
 .share-summary-block--streak {
@@ -428,11 +444,11 @@
 
 .share-summary-block--carbon {
   background: rgba(245,240,232,0.08);
-  padding: 0.9rem 1rem;
+  padding: 0.75rem 0.85rem;
   border-radius: 1rem;
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.82rem;
-  line-height: 1.55;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .share-summary-block--leaderboard {
@@ -447,10 +463,10 @@
   background: rgba(201,168,76,0.08);
   border: 1px solid rgba(201,168,76,0.16);
   border-radius: 1rem;
-  padding: 0.9rem 1rem;
+  padding: 0.75rem 0.85rem;
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.82rem;
-  line-height: 1.55;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .share-stats-row {
@@ -458,23 +474,25 @@
   align-items: stretch;
   gap: 0.9rem;
   margin-bottom: 0.9rem;
+  min-width: 0;
 }
 
 .share-stats-row--carbon .share-stat-item {
   background: rgba(245,240,232,0.06);
   border-radius: 0.95rem;
-  padding: 0.8rem 0.9rem;
+  padding: 0.65rem 0.7rem;
 }
 
 .share-stats-row--level .share-stat-item {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(245,240,232,0.06);
   border-radius: 0.95rem;
-  padding: 0.8rem 0.9rem;
+  padding: 0.65rem 0.7rem;
 }
 
 .share-stat-item {
   min-width: 0;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
@@ -486,6 +504,7 @@
   font-weight: 700;
   color: #ffffff;
   line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .share-stat-label {
@@ -523,6 +542,8 @@
   letter-spacing: 0.09rem;
   text-transform: uppercase;
   color: rgba(245, 240, 232, 0.68);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .share-xp-bar-bg {
@@ -536,6 +557,7 @@
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, #4a7c59, #c9a84c);
+  transition: width 0.7s ease;
 }
 
 .share-card-bottom {
@@ -552,6 +574,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.16rem;
+  min-width: 0;
 }
 
 .share-card-cta strong {
@@ -566,6 +589,7 @@
   font-size: 0.68rem;
   line-height: 1.45;
   color: #f5f0e8;
+  overflow-wrap: anywhere;
 }
 
 .share-card-date {
@@ -575,6 +599,78 @@
   text-transform: uppercase;
   color: rgba(245, 240, 232, 0.68);
   text-align: right;
+}
+
+.share-card-preview--leaderboard .share-hero-panel {
+  align-items: stretch;
+  gap: 0.8rem;
+}
+
+.share-card-preview--leaderboard .share-hero-copy {
+  justify-content: center;
+}
+
+.share-card-preview--leaderboard .share-hero-value {
+  font-size: clamp(2.6rem, 6vw, 4.1rem);
+}
+
+.share-card-preview--leaderboard .share-hero-unit {
+  max-width: 16rem;
+}
+
+.share-card-preview--leaderboard .share-hero-mark {
+  min-width: 5.4rem;
+  min-height: 5.4rem;
+  font-size: 0.52rem;
+  letter-spacing: 0.09rem;
+}
+
+.share-card-preview--leaderboard .share-summary-block {
+  max-width: 72%;
+}
+
+.share-card-preview--carbon .share-hero-value,
+.share-card-preview--level .share-hero-value {
+  font-size: clamp(1.9rem, 4.4vw, 3rem);
+}
+
+.share-card-preview--carbon .share-hero-unit,
+.share-card-preview--level .share-hero-unit {
+  font-size: 0.6rem;
+  letter-spacing: 0.08rem;
+}
+
+.share-card-preview--carbon .share-stats-row,
+.share-card-preview--level .share-stats-row {
+  gap: 0.55rem;
+}
+
+.share-card-preview--carbon .share-stat-value,
+.share-card-preview--level .share-stat-value {
+  font-size: clamp(0.98rem, 2.2vw, 1.3rem);
+}
+
+.share-card-preview--carbon .share-stat-label,
+.share-card-preview--level .share-stat-label {
+  font-size: 0.44rem;
+  letter-spacing: 0.06rem;
+}
+
+.share-card-preview--carbon .share-level-badge,
+.share-card-preview--level .share-level-badge {
+  padding: 0.28rem 0.62rem 0.28rem 0.4rem;
+}
+
+.share-card-preview--carbon .share-level-badge span,
+.share-card-preview--level .share-level-badge span {
+  font-size: 0.56rem;
+  letter-spacing: 0.06rem;
+}
+
+.share-card-preview--carbon .share-card-ribbon,
+.share-card-preview--level .share-card-ribbon {
+  font-size: 0.48rem;
+  letter-spacing: 0.12rem;
 }
 
 .share-download-btn {
@@ -606,6 +702,10 @@
     min-height: auto;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .share-card-preview--leaderboard .share-summary-block {
+    max-width: 100%;
   }
 
   .share-hero-mark {

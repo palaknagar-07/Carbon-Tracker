@@ -12,6 +12,7 @@ const {
   DAY_MS,
   LEVELS,
   STREAK_MILESTONES,
+  aggregateWeeklyStats,
   calculateStreak,
   checkBadgeUnlocks,
   awardXP,
@@ -594,7 +595,7 @@ async function updateLeaderboard(userId, name, email, totalPoints, totalCarbonSa
 }
 
 async function getLeaderboardRank(userId) {
-  const snapshot = await db.collection('leaderboard').orderBy('totalPoints', 'desc').limit(200).get();
+  const snapshot = await db.collection('leaderboard').orderBy('totalPoints', 'desc').get();
   let rank = null;
   let index = 1;
   snapshot.forEach((doc) => {
@@ -1470,11 +1471,12 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
       return tb - ta;
     });
 
-    const [streakDoc, rewardsDoc, badgesSnap, notificationsSnap] = await Promise.all([
+    const [streakDoc, rewardsDoc, badgesSnap, notificationsSnap, rank] = await Promise.all([
       db.collection('streaks').doc(userId).get(),
       db.collection('rewards').doc(userId).get(),
       db.collection('badges').where('userId', '==', userId).get(),
-      db.collection('notifications').where('userId', '==', userId).get()
+      db.collection('notifications').where('userId', '==', userId).get(),
+      getLeaderboardRank(userId)
     ]);
     const badges = [];
     badgesSnap.forEach((d) => {
@@ -1541,6 +1543,7 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
           carbonSaved: weeklyCarbonSaved
         },
         gamification: {
+          rank,
           streak: {
             currentStreak: Number(recalculatedStreak.currentStreak) || 0,
             bestStreak: Number(recalculatedStreak.bestStreak) || 0,
@@ -1568,26 +1571,28 @@ app.get('/api/gamification/summary/:userId', readLimiter, requireAuth, async (re
     const { userId } = req.params;
     if (req.authUser.uid !== userId) return sendResponse(res, false, null, 'Forbidden', 403);
 
-    const [userDoc, commutesSnap, badgesSnap] = await Promise.all([
+    const [userDoc, commutesSnap, badgesSnap, rewardsDoc] = await Promise.all([
       db.collection('users').doc(userId).get(),
       db.collection('commutes').where('userId', '==', userId).get(),
-      db.collection('badges').where('userId', '==', userId).get()
+      db.collection('badges').where('userId', '==', userId).get(),
+      db.collection('rewards').doc(userId).get()
     ]);
     if (!userDoc.exists) return sendResponse(res, false, null, 'User not found', 404);
 
     const sevenDaysAgo = Date.now() - 7 * DAY_MS;
     const weekCommutes = [];
-    let weekCarbonSaved = 0;
-    let weekXp = 0;
     commutesSnap.forEach((doc) => {
       const data = doc.data() || {};
       const ts = normalizeToDate(data.timestamp);
       if (ts && ts.getTime() >= sevenDaysAgo) {
         weekCommutes.push(data);
-        weekCarbonSaved += Number(data.carbonSavedVsCar) || 0;
-        weekXp += Number(data.xpEarned ?? data.pointsEarned) || 0;
       }
     });
+    const rewardsData = rewardsDoc.exists ? rewardsDoc.data() : {};
+    const { weekCarbonSaved, weekXp } = aggregateWeeklyStats(
+      weekCommutes,
+      rewardsData.totalXp
+    );
 
     const summary = generateWeeklySummary({
       weekCommutes,
