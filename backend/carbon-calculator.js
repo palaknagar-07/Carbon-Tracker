@@ -18,8 +18,8 @@ function calculateCarbon(transportMode, distance) {
   const carCarbonEmitted = (carCarbonFactor * distance) / 1000; // Convert to kg
   const carbonSavedVsCar = Math.max(0, carCarbonEmitted - carbonEmitted);
   
-  // Calculate points earned (0.1 points per gram of carbon saved)
-  const pointsEarned = Math.round(carbonSavedVsCar * 100); // Convert kg to grams, then multiply by 0.1
+  // Calculate points earned from carbon saved versus driving
+  const pointsEarned = Math.round(carbonSavedVsCar * 50);
   
   return {
     carbonEmitted,

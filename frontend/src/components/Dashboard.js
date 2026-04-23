@@ -4,6 +4,7 @@ import CommuteLogger from './CommuteLogger';
 import Leaderboard from './Leaderboard';
 import TripDetails from './TripDetails';
 import GamificationHub from './GamificationHub';
+import FaqPage from './FaqPage';
 import './Dashboard.css';
 
 const MOTIVATIONAL_TAGLINES = [
@@ -231,6 +232,13 @@ const Dashboard = ({ user, onLogout }) => {
         >
           My Profile
         </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'faq' ? 'active' : ''}`}
+          onClick={() => setActiveTab('faq')}
+        >
+          FAQ
+        </button>
       </div>
 
       {fetchError && (
@@ -280,7 +288,7 @@ const Dashboard = ({ user, onLogout }) => {
             <div className="stat-card">
               <div className="stat-label">Today&apos;s emissions</div>
               <div className="stat-value">{formatNumber(userStats.todayEmittedKg.toFixed(2))}</div>
-              <div className="stat-unit">kg CO₂ (this trip type)</div>
+              <div className="stat-unit">kg CO₂ across today&apos;s trips</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">This week saved</div>
@@ -371,6 +379,7 @@ const Dashboard = ({ user, onLogout }) => {
               profileStats={userStats}
             />
           )}
+          {activeTab === 'faq' && <FaqPage />}
         </>
       )}
     </div>

@@ -2,34 +2,69 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/client';
 import './Leaderboard.css';
 
+const LEADERBOARD_CACHE_TTL_MS = 10 * 1000;
+let leaderboardCache = {
+  rows: [],
+  fetchedAt: 0
+};
+
+function hasFreshLeaderboardCache() {
+  return (
+    leaderboardCache.rows.length > 0 &&
+    Date.now() - leaderboardCache.fetchedAt < LEADERBOARD_CACHE_TTL_MS
+  );
+}
+
 const Leaderboard = ({ gamificationData, user }) => {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState(() => (hasFreshLeaderboardCache() ? leaderboardCache.rows : []));
+  const [loading, setLoading] = useState(() => !hasFreshLeaderboardCache());
   const [error, setError] = useState('');
   
   const userRank = gamificationData?.rank;
   const isUserInTop10 = leaderboard.some(row => row.userId === user?.userId);
 
   useEffect(() => {
-    fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    let isMounted = true;
+    const silentRefresh = hasFreshLeaderboardCache();
 
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await api.get('/api/leaderboard');
-      if (response.data.success) {
-        setLeaderboard(response.data.leaderboard);
-      } else {
-        setError('Failed to fetch leaderboard');
+    const fetchLeaderboard = async ({ silent = false } = {}) => {
+      try {
+        const response = await api.get('/api/leaderboard');
+        if (!isMounted) return;
+
+        if (response.data.success) {
+          const rows = response.data.leaderboard || [];
+          leaderboardCache = {
+            rows,
+            fetchedAt: Date.now()
+          };
+          setLeaderboard(rows);
+          setError('');
+        } else if (!silent) {
+          setError('Failed to fetch leaderboard');
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        if (!silent) {
+          setError('Network error. Please try again.');
+        }
+      } finally {
+        if (isMounted && !silent) {
+          setLoading(false);
+        }
       }
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchLeaderboard({ silent: silentRefresh });
+    const interval = setInterval(() => {
+      fetchLeaderboard({ silent: true });
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const formatNumber = (num) => num.toLocaleString();
 

@@ -5,9 +5,18 @@ const {
   aggregateWeeklyStats,
   awardXP,
   calculateLevel,
-  calculateLevelProgress
+  calculateLevelProgress,
+  calculateStreak
 } = require('./gamification-service');
 const { calculateEnvironmentalImpact } = require('./impact-equivalents');
+
+function toIstDayKey(date) {
+  const shifted = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+  const year = shifted.getUTCFullYear();
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 test('calculateEnvironmentalImpact keeps car off-road hours realistic', () => {
   const impact = calculateEnvironmentalImpact(0.384);
@@ -50,9 +59,47 @@ test('calculateLevelProgress is proportional to completed levels', () => {
 });
 
 test('calculateLevel exposes level-based progress instead of XP overflow', () => {
-  const level = calculateLevel(950);
+  const level = calculateLevel(2600);
 
   assert.equal(level.level, 3);
   assert.equal(level.totalLevels, 5);
   assert.equal(level.progressPercent, 60);
+});
+
+test('calculateStreak can rebuild strictly from commute history', () => {
+  const now = new Date('2026-04-23T12:00:00.000Z');
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+  const streak = calculateStreak(
+    {
+      days: [
+        toIstDayKey(now),
+        toIstDayKey(yesterday),
+        toIstDayKey(twoDaysAgo)
+      ],
+      bestStreak: 3
+    },
+    [now],
+    { rebuildFromHistory: true }
+  );
+
+  assert.equal(streak.currentStreak, 1);
+  assert.equal(streak.days.length, 1);
+});
+
+test('calculateStreak preserves stored days during incremental updates', () => {
+  const now = new Date('2026-04-23T12:00:00.000Z');
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const streak = calculateStreak(
+    {
+      days: [toIstDayKey(yesterday)],
+      bestStreak: 1
+    },
+    [now]
+  );
+
+  assert.equal(streak.currentStreak, 2);
+  assert.equal(streak.days.length, 2);
 });

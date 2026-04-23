@@ -3,10 +3,10 @@ const INDIA_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 const LEVELS = [
   { level: 1, title: 'Seedling', minXp: 0 },
-  { level: 2, title: 'Eco Starter', minXp: 300 },
-  { level: 3, title: 'Green Warrior', minXp: 900 },
-  { level: 4, title: 'Planet Protector', minXp: 1800 },
-  { level: 5, title: 'Climate Hero', minXp: 3200 }
+  { level: 2, title: 'Eco Starter', minXp: 1000 },
+  { level: 3, title: 'Green Warrior', minXp: 2500 },
+  { level: 4, title: 'Planet Protector', minXp: 5500 },
+  { level: 5, title: 'Climate Hero', minXp: 11500 }
 ];
 
 const STREAK_MILESTONES = { 7: 80, 30: 220, 60: 420, 100: 800 };
@@ -73,13 +73,25 @@ function calculateLevel(totalXp) {
   };
 }
 
-function calculateStreak(streakDoc, commuteTimestamps) {
+function calculateStreak(streakDoc, commuteTimestamps, options = {}) {
   const existing = streakDoc || {};
-  const days = new Set((existing.days || []).map((d) => String(d)));
+  const { rebuildFromHistory = false } = options;
+  const computedDays = [];
+
   commuteTimestamps.forEach((ts) => {
     const d = normalizeToDate(ts);
-    if (d) days.add(toDayKey(d));
+    const dayKey = d ? toDayKey(d) : null;
+    if (dayKey) computedDays.push(dayKey);
   });
+
+  const days = rebuildFromHistory
+    ? new Set(computedDays)
+    : new Set((existing.days || []).map((d) => String(d)));
+
+  if (!rebuildFromHistory) {
+    computedDays.forEach((dayKey) => days.add(dayKey));
+  }
+
   const sorted = Array.from(days).sort();
   let best = Math.max(0, Number(existing.bestStreak) || 0);
   let run = 1;

@@ -38,11 +38,16 @@ const MAP_ROUTE_TOKEN_TTL_SECONDS = Number(process.env.MAP_ROUTE_TOKEN_TTL_SECON
 const ROUTE_TOKEN_SECRET = String(process.env.ROUTE_TOKEN_SECRET || process.env.OPENROUTESERVICE_API_KEY || '').trim();
 const ROUTE_TOKEN_COLLECTION = 'route_tokens';
 const ORS_ROUTE_SNAP_RADIUS_METERS = 5000;
+const LEADERBOARD_CACHE_TTL_MS = 10 * 1000;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ORS_ALLOWED_PROFILES = new Set(['driving-car', 'cycling-regular', 'foot-walking']);
 const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY || '';
 const INDIA_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const leaderboardCache = {
+  data: null,
+  expiresAt: 0
+};
 
 function normalizeEmail(email) {
   return String(email || '')
@@ -61,6 +66,11 @@ function sendResponse(res, success, payload, message = '', statusCode = 200) {
     Object.assign(body, payload);
   }
   res.status(statusCode).json(body);
+}
+
+function invalidateLeaderboardCache() {
+  leaderboardCache.data = null;
+  leaderboardCache.expiresAt = 0;
 }
 
 function firestoreTimestampToDate(ts) {
@@ -563,6 +573,8 @@ async function applyTripEffects(userId, name, email, pointsEarned, carbonSaved, 
       { merge: true }
     );
 
+    invalidateLeaderboardCache();
+
     return {
       newTotalPoints,
       newTotalCarbonSaved,
@@ -587,6 +599,8 @@ async function updateLeaderboard(userId, name, email, totalPoints, totalCarbonSa
       },
       { merge: true }
     );
+
+    invalidateLeaderboardCache();
 
     return true;
   } catch (error) {
@@ -1478,6 +1492,10 @@ app.post('/api/routes/directions', readLimiter, requireAuth, async (req, res) =>
 
 app.get('/api/leaderboard', readLimiter, async (req, res) => {
   try {
+    if (leaderboardCache.data && leaderboardCache.expiresAt > Date.now()) {
+      return sendResponse(res, true, { leaderboard: leaderboardCache.data });
+    }
+
     const leaderboardRef = db.collection('leaderboard');
     const snapshot = await leaderboardRef.orderBy('totalPoints', 'desc').limit(10).get();
 
@@ -1497,10 +1515,13 @@ app.get('/api/leaderboard', readLimiter, async (req, res) => {
       rank++;
     });
 
-    sendResponse(res, true, { leaderboard });
+    leaderboardCache.data = leaderboard;
+    leaderboardCache.expiresAt = Date.now() + LEADERBOARD_CACHE_TTL_MS;
+
+    return sendResponse(res, true, { leaderboard });
   } catch (error) {
     console.error('Leaderboard error:', error);
-    sendResponse(res, false, null, safeErrorMessage(error), 500);
+    return sendResponse(res, false, null, safeErrorMessage(error), 500);
   }
 });
 
@@ -1590,7 +1611,9 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
     });
     
     const streakData = streakDoc.exists ? streakDoc.data() : {};
-    const recalculatedStreak = calculateStreak(streakData, allCommuteTimestamps);
+    const recalculatedStreak = calculateStreak(streakData, allCommuteTimestamps, {
+      rebuildFromHistory: true
+    });
     
     // Update streak document if it's stale
     if (recalculatedStreak.currentStreak !== (streakData.currentStreak || 0)) {

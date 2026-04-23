@@ -622,7 +622,7 @@ const GamificationHub = ({ data, weeklySummary, userName, profileStats }) => {
         progressPercent: 0,
         totalLevels: DEFAULT_TOTAL_LEVELS,
         currentXp: 0,
-        nextLevelXp: 300
+        nextLevelXp: 1000
       },
     [rewards]
   );
