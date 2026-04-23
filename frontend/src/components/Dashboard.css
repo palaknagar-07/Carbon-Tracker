@@ -160,6 +160,25 @@
   flex: 0 0 auto;
 }
 
+.streak-alert {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  background: linear-gradient(180deg, #fff7e8 0%, #fffdf7 100%);
+  color: #8a5a00;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  box-shadow: 0 8px 22px rgba(138, 90, 0, 0.08);
+}
+
+.streak-alert-broken {
+  border-color: rgba(214, 56, 56, 0.22);
+  background: linear-gradient(180deg, #fff2f2 0%, #fffafa 100%);
+  color: #a12a2a;
+  box-shadow: 0 8px 22px rgba(161, 42, 42, 0.08);
+}
+
 .insight-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

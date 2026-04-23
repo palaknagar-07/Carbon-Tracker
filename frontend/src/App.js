@@ -6,6 +6,34 @@ import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
 import './App.css';
 
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('carbonGamifiedUser');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_error) {
+    localStorage.removeItem('carbonGamifiedUser');
+    return null;
+  }
+}
+
+function normalizeAuthenticatedUser(firebaseUser, userData = {}, userIdOverride) {
+  return {
+    ...userData,
+    userId: userIdOverride || userData.userId || userData.uid || firebaseUser.uid,
+    uid: userData.uid || firebaseUser.uid,
+    email: userData.email || firebaseUser.email,
+    name: userData.name || firebaseUser.displayName || 'User',
+    profilePicture: userData.profilePicture || firebaseUser.photoURL || null
+  };
+}
+
+function shouldClearAuthSession(error) {
+  const status = Number(error?.response?.status);
+  return status === 401 || status === 403;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,14 +55,11 @@ function App() {
 
         if (response.data?.success) {
           const userData = response.data.user || {};
-          const normalized = {
-            ...userData,
-            userId: response.data.userId || userData.uid || firebaseUser.uid,
-            uid: userData.uid || firebaseUser.uid,
-            email: userData.email || firebaseUser.email,
-            name: userData.name || firebaseUser.displayName || 'User',
-            profilePicture: userData.profilePicture || firebaseUser.photoURL || null
-          };
+          const normalized = normalizeAuthenticatedUser(
+            firebaseUser,
+            userData,
+            response.data.userId
+          );
           setUser(normalized);
           localStorage.setItem('carbonGamifiedUser', JSON.stringify(normalized));
         } else {
@@ -43,9 +68,18 @@ function App() {
         }
       } catch (error) {
         console.error('Failed to restore session:', error);
-        await signOut(auth).catch(() => null);
-        setUser(null);
-        localStorage.removeItem('carbonGamifiedUser');
+        if (shouldClearAuthSession(error)) {
+          await signOut(auth).catch(() => null);
+          setUser(null);
+          localStorage.removeItem('carbonGamifiedUser');
+        } else {
+          const fallbackUser = normalizeAuthenticatedUser(
+            firebaseUser,
+            getStoredUser() || {}
+          );
+          setUser(fallbackUser);
+          localStorage.setItem('carbonGamifiedUser', JSON.stringify(fallbackUser));
+        }
       } finally {
         setLoading(false);
       }

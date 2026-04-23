@@ -184,6 +184,13 @@ const Dashboard = ({ user, onLogout }) => {
   const displayName = user?.name || 'Eco Hero';
   const tagline = MOTIVATIONAL_TAGLINES[(tipIndex + 1) % MOTIVATIONAL_TAGLINES.length];
   const currentStreak = Number(gamificationData?.streak?.currentStreak) || 0;
+  const streakStatus = gamificationData?.streak?.streakStatus || 'inactive';
+  const streakAlert =
+    streakStatus === 'at_risk' && currentStreak > 0
+      ? `Your ${currentStreak}-day streak is about to end. Log a commute today to keep it alive.`
+      : streakStatus === 'broken'
+        ? 'Your streak has ended. Start a new one today with a positive commute.'
+        : '';
 
   if (loading) {
     return (
@@ -272,6 +279,12 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
             <div className="welcome-badge" aria-hidden="true">🌎</div>
           </section>
+
+          {streakAlert ? (
+            <div className={`streak-alert ${streakStatus === 'broken' ? 'streak-alert-broken' : ''}`}>
+              {streakAlert}
+            </div>
+          ) : null}
 
           <section className="insight-row">
             <article className="insight-card tip-card">

@@ -108,10 +108,45 @@ function sanitizeUserDocForApi(userData) {
   return out;
 }
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+function normalizeOriginValue(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function getAllowedOrigins() {
+  const envOrigins = String(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => normalizeOriginValue(origin))
+    .filter(Boolean);
+
+  const inferredOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.APP_URL,
+    process.env.CLIENT_URL,
+    process.env.CORS_ORIGIN,
+    process.env.VERCEL_URL
+  ]
+    .map((origin) => normalizeOriginValue(origin))
+    .filter(Boolean);
+
+  const mergedOrigins = Array.from(new Set([...envOrigins, ...inferredOrigins]));
+
+  if (mergedOrigins.length > 0) {
+    return mergedOrigins;
+  }
+
+  if (isProd) {
+    throw new Error(
+      'CORS origins are not configured. Set ALLOWED_ORIGINS or FRONTEND_URL before starting the production API.'
+    );
+  }
+
+  return ['http://localhost:3000', 'http://127.0.0.1:3000'];
+}
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(
   helmet({
@@ -1080,11 +1115,6 @@ app.post('/api/commute/routed', commuteLimiter, requireAuth, async (req, res) =>
     ) {
       return sendResponse(res, false, null, 'Submitted route does not match validated route token', 400);
     }
-    const consumeResult = await consumeRouteTokenOrReject(tokenPayload);
-    if (!consumeResult.ok) {
-      return sendResponse(res, false, null, consumeResult.error, 400);
-    }
-
     const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, transportMode, reportedDistance);
     if (!tripGuards.ok) {
       return sendResponse(res, false, null, tripGuards.error, 429);
@@ -1102,6 +1132,11 @@ app.post('/api/commute/routed', commuteLimiter, requireAuth, async (req, res) =>
     const bonusMultiplier = validationScore >= 60 ? 1.2 : 1.0;
     const carbonCalculation = calculateCarbon(transportMode, reportedDistance);
     const adjustedPoints = Math.round(carbonCalculation.pointsEarned * bonusMultiplier);
+
+    const consumeResult = await consumeRouteTokenOrReject(tokenPayload);
+    if (!consumeResult.ok) {
+      return sendResponse(res, false, null, consumeResult.error, 400);
+    }
 
     const commuteRef = db.collection('commutes').doc();
     await commuteRef.set({
@@ -1627,7 +1662,12 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
     });
     
     // Update streak document if it's stale
-    if (recalculatedStreak.currentStreak !== (streakData.currentStreak || 0)) {
+    if (
+      recalculatedStreak.currentStreak !== (streakData.currentStreak || 0) ||
+      recalculatedStreak.streakStatus !== (streakData.streakStatus || 'inactive') ||
+      recalculatedStreak.needsTripToday !== Boolean(streakData.needsTripToday) ||
+      recalculatedStreak.lastLoggedDate !== (streakData.lastLoggedDate || null)
+    ) {
       await db.collection('streaks').doc(userId).set({
         userId,
         ...recalculatedStreak,
@@ -1641,6 +1681,17 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
     const daysInactive = latestCommuteDate
       ? Math.floor((Date.now() - latestCommuteDate.getTime()) / DAY_MS)
       : 999;
+    const nudges = [];
+
+    if (recalculatedStreak.streakStatus === 'at_risk' && recalculatedStreak.currentStreak > 0) {
+      nudges.push(
+        `Your ${recalculatedStreak.currentStreak}-day streak is about to end. Log a commute today to keep it alive.`
+      );
+    } else if (recalculatedStreak.streakStatus === 'broken' && recalculatedStreak.lastLoggedDate) {
+      nudges.push('Your streak has ended. Start a new one today with a positive commute.');
+    } else if (daysInactive >= 3) {
+      nudges.push('We miss you! Come back today to restart your eco streak.');
+    }
 
     const userResponse = sanitizeUserDocForApi(userData);
 
@@ -1656,7 +1707,10 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
           streak: {
             currentStreak: Number(recalculatedStreak.currentStreak) || 0,
             bestStreak: Number(recalculatedStreak.bestStreak) || 0,
-            streakCalendar: recalculatedStreak.streakCalendar || []
+            streakCalendar: recalculatedStreak.streakCalendar || [],
+            streakStatus: recalculatedStreak.streakStatus || 'inactive',
+            needsTripToday: Boolean(recalculatedStreak.needsTripToday),
+            lastLoggedDate: recalculatedStreak.lastLoggedDate || null
           },
           rewards: {
             totalXp: Number(rewards.totalXp) || 0,
@@ -1664,7 +1718,7 @@ app.get('/api/user/:userId', readLimiter, requireAuth, async (req, res) => {
             xpBreakdown: rewards.xpBreakdown || {}
           },
           badges,
-          nudges: daysInactive >= 3 ? ['We miss you! Come back today to restart your eco streak.'] : [],
+          nudges,
           notifications: notifications.slice(0, 12)
         }
       }

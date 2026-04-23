@@ -81,11 +81,12 @@ test('calculateStreak can rebuild strictly from commute history', () => {
       bestStreak: 3
     },
     [now],
-    { rebuildFromHistory: true }
+    { rebuildFromHistory: true, now }
   );
 
   assert.equal(streak.currentStreak, 1);
   assert.equal(streak.days.length, 1);
+  assert.equal(streak.streakStatus, 'active');
 });
 
 test('calculateStreak preserves stored days during incremental updates', () => {
@@ -97,9 +98,43 @@ test('calculateStreak preserves stored days during incremental updates', () => {
       days: [toIstDayKey(yesterday)],
       bestStreak: 1
     },
-    [now]
+    [now],
+    { now }
   );
 
   assert.equal(streak.currentStreak, 2);
   assert.equal(streak.days.length, 2);
+  assert.equal(streak.streakStatus, 'active');
+});
+
+test('calculateStreak keeps yesterday streak visible but marks it at risk', () => {
+  const now = new Date('2026-04-24T12:00:00.000Z');
+  const yesterday = new Date('2026-04-23T12:00:00.000Z');
+  const twoDaysAgo = new Date('2026-04-22T12:00:00.000Z');
+
+  const streak = calculateStreak(
+    {},
+    [twoDaysAgo, yesterday],
+    { rebuildFromHistory: true, now }
+  );
+
+  assert.equal(streak.currentStreak, 2);
+  assert.equal(streak.streakStatus, 'at_risk');
+  assert.equal(streak.needsTripToday, true);
+});
+
+test('calculateStreak resets current streak after a missed day', () => {
+  const now = new Date('2026-04-25T12:00:00.000Z');
+  const twoDaysAgo = new Date('2026-04-23T12:00:00.000Z');
+  const threeDaysAgo = new Date('2026-04-22T12:00:00.000Z');
+
+  const streak = calculateStreak(
+    {},
+    [threeDaysAgo, twoDaysAgo],
+    { rebuildFromHistory: true, now }
+  );
+
+  assert.equal(streak.currentStreak, 0);
+  assert.equal(streak.streakStatus, 'broken');
+  assert.equal(streak.bestStreak, 2);
 });

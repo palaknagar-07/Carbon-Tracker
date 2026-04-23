@@ -49,6 +49,12 @@ function toDayKey(dateObj) {
   return `${istYear}-${istMonth}-${istDay}`;
 }
 
+function dayKeyToTime(dayKey) {
+  if (!dayKey) return null;
+  const time = new Date(`${dayKey}T00:00:00.000Z`).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
 function calculateLevelProgress(currentLevel, totalLevels = LEVELS.length) {
   const safeTotalLevels = Math.max(1, Number(totalLevels) || LEVELS.length);
   const safeCurrentLevel = Math.max(0, Math.min(Number(currentLevel) || 0, safeTotalLevels));
@@ -75,7 +81,7 @@ function calculateLevel(totalXp) {
 
 function calculateStreak(streakDoc, commuteTimestamps, options = {}) {
   const existing = streakDoc || {};
-  const { rebuildFromHistory = false } = options;
+  const { rebuildFromHistory = false, now = new Date() } = options;
   const computedDays = [];
 
   commuteTimestamps.forEach((ts) => {
@@ -103,12 +109,38 @@ function calculateStreak(streakDoc, commuteTimestamps, options = {}) {
     if (run > best) best = run;
   }
 
-  let current = 0;
-  let cursor = new Date();
+  let trailingRun = 0;
+  if (sorted.length > 0) {
+    trailingRun = 1;
+    for (let i = sorted.length - 1; i > 0; i -= 1) {
+      const curr = dayKeyToTime(sorted[i]);
+      const prev = dayKeyToTime(sorted[i - 1]);
+      if (curr == null || prev == null) break;
+      const diffDays = Math.round((curr - prev) / DAY_MS);
+      if (diffDays !== 1) break;
+      trailingRun += 1;
+    }
+  }
 
-  while (days.has(toDayKey(cursor))) {
-    current += 1;
-    cursor = new Date(cursor.getTime() - DAY_MS);
+  const todayKey = toDayKey(now);
+  const yesterdayKey = toDayKey(new Date(new Date(now).getTime() - DAY_MS));
+  const lastLoggedDate = sorted[sorted.length - 1] || null;
+
+  let current = 0;
+  let streakStatus = 'inactive';
+  let needsTripToday = false;
+
+  if (lastLoggedDate) {
+    if (lastLoggedDate === todayKey) {
+      current = trailingRun;
+      streakStatus = 'active';
+    } else if (lastLoggedDate === yesterdayKey) {
+      current = trailingRun;
+      streakStatus = 'at_risk';
+      needsTripToday = true;
+    } else {
+      streakStatus = 'broken';
+    }
   }
 
   const streakCalendar = sorted.slice(-42);
@@ -117,7 +149,9 @@ function calculateStreak(streakDoc, commuteTimestamps, options = {}) {
     bestStreak: Math.max(best, current),
     days: sorted,
     streakCalendar,
-    lastLoggedDate: sorted[sorted.length - 1] || null
+    lastLoggedDate,
+    streakStatus,
+    needsTripToday
   };
 }
 
