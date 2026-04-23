@@ -294,12 +294,13 @@ const CommuteLogger = ({ user, onCommuteLogged }) => {
               <h4>How to use Map Route</h4>
               <ol className="map-route-guide-list">
                 <li>Select your transport mode first.</li>
-                <li>Tap the map once to set <strong>From</strong>, then tap again to set <strong>To</strong>.</li>
-                <li>Tap close to a road or use the address search for better route accuracy.</li>
-                <li>Wait for the route distance to appear before logging the trip.</li>
+                <li>Enter your <strong>From</strong> location and <strong>To</strong> destination, then click <strong>Find Route</strong>.</li>
+                <li>If you selected locations directly on the map using the picker, do not click <strong>Find Route</strong> again because the route is already calculated.</li>
+                <li>Once the route is visible and distance is ready, click <strong>Log commute</strong>.</li>
+                <li>Use <strong>My Location</strong> if you want the app to auto-detect your starting point after permission, then choose your destination.</li>
               </ol>
               <p className="map-route-guide-note">
-                If a point is too far from a mapped road, route verification may fail and the app will use a fallback distance.
+                Tip: if a selected point is too far from a mapped road, verified routing may fail and the app may use a fallback distance.
               </p>
             </div>
             <MapComponent onRouteCalculated={handleRouteCalculated} transportMode={transportMode} />

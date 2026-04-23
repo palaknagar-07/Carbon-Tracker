@@ -169,6 +169,14 @@ const Dashboard = ({ user, onLogout }) => {
     setActiveTab('dashboard');
   };
 
+  const handleTabNavigation = (tab) => {
+    setShowTripDetails(false);
+    setTripDetailsData(null);
+    setTripTransportMode('');
+    setTripDistance(0);
+    setActiveTab(tab);
+  };
+
   const formatNumber = (num) => num.toLocaleString();
   const currentHour = new Date().getHours();
   const greetingPrefix = currentHour < 12 ? 'Good Morning' : currentHour < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -207,35 +215,35 @@ const Dashboard = ({ user, onLogout }) => {
         <button
           type="button"
           className={`tab ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => handleTabNavigation('dashboard')}
         >
           Dashboard
         </button>
         <button
           type="button"
           className={`tab ${activeTab === 'commute' ? 'active' : ''}`}
-          onClick={() => setActiveTab('commute')}
+          onClick={() => handleTabNavigation('commute')}
         >
           Log Commute
         </button>
         <button
           type="button"
           className={`tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('leaderboard')}
+          onClick={() => handleTabNavigation('leaderboard')}
         >
           Leaderboard
         </button>
         <button
           type="button"
           className={`tab ${activeTab === 'gamification' ? 'active' : ''}`}
-          onClick={() => setActiveTab('gamification')}
+          onClick={() => handleTabNavigation('gamification')}
         >
           My Profile
         </button>
         <button
           type="button"
           className={`tab ${activeTab === 'faq' ? 'active' : ''}`}
-          onClick={() => setActiveTab('faq')}
+          onClick={() => handleTabNavigation('faq')}
         >
           FAQ
         </button>
@@ -355,13 +363,11 @@ const Dashboard = ({ user, onLogout }) => {
           onBack={handleBackToDashboard}
           onNavigateToLeaderboard={() => {
             console.log('Navigating to leaderboard from trip details');
-            setShowTripDetails(false);
-            setActiveTab('leaderboard');
+            handleTabNavigation('leaderboard');
           }}
           onLogAnotherTrip={() => {
             console.log('Navigating to commute logging from trip details');
-            setShowTripDetails(false);
-            setActiveTab('commute');
+            handleTabNavigation('commute');
           }}
         />
       ) : (

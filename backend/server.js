@@ -8,6 +8,12 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { db, admin } = require('./firebase-config');
 const { calculateCarbon, isValidTransportMode } = require('./carbon-calculator');
+const { serializeRouteCoordinatesForFirestore } = require('./route-storage');
+const {
+  buildDailyDistanceLimitMessage,
+  getDailyDistanceLimitKm,
+  normalizeTransportMode
+} = require('./trip-limits');
 const {
   DAY_MS,
   LEVELS,
@@ -33,7 +39,6 @@ const MAX_COMMUTE_DISTANCE_KM = Number(process.env.MAX_COMMUTE_DISTANCE_KM) || 5
 const MAX_NAME_LENGTH = 120;
 const MAX_TRACKED_PATH_POINTS = 100;
 const MIN_TRIP_INTERVAL_SECONDS = Number(process.env.MIN_TRIP_INTERVAL_SECONDS) || 60;
-const MAX_DAILY_DISTANCE_KM = Number(process.env.MAX_DAILY_DISTANCE_KM) || 300;
 const MAP_ROUTE_TOKEN_TTL_SECONDS = Number(process.env.MAP_ROUTE_TOKEN_TTL_SECONDS) || 900;
 const ROUTE_TOKEN_SECRET = String(process.env.ROUTE_TOKEN_SECRET || process.env.OPENROUTESERVICE_API_KEY || '').trim();
 const ROUTE_TOKEN_COLLECTION = 'route_tokens';
@@ -490,11 +495,13 @@ async function consumeRouteTokenOrReject(tokenPayload) {
   }
 }
 
-async function enforceTripFrequencyAndDailyDistance(userId, proposedDistanceKm) {
+async function enforceTripFrequencyAndDailyDistance(userId, transportMode, proposedDistanceKm) {
   const commutesRef = db.collection('commutes');
   const now = new Date();
   const minAllowedTs = new Date(now.getTime() - MIN_TRIP_INTERVAL_SECONDS * 1000);
   const dayStart = startOfIstDay(now);
+  const normalizedMode = normalizeTransportMode(transportMode);
+  const dailyLimitKm = getDailyDistanceLimitKm(normalizedMode);
 
   const userSnapshot = await commutesRef.where('userId', '==', userId).get();
 
@@ -506,7 +513,7 @@ async function enforceTripFrequencyAndDailyDistance(userId, proposedDistanceKm) 
     if (ts && (!mostRecent || ts > mostRecent)) {
       mostRecent = ts;
     }
-    if (ts && ts >= dayStart) {
+    if (ts && ts >= dayStart && normalizeTransportMode(data.transportMode) === normalizedMode) {
       todayDistance += Number(data.distance) || 0;
     }
   });
@@ -519,10 +526,14 @@ async function enforceTripFrequencyAndDailyDistance(userId, proposedDistanceKm) 
     };
   }
 
-  if (todayDistance + proposedDistanceKm > MAX_DAILY_DISTANCE_KM) {
+  if (todayDistance + proposedDistanceKm > dailyLimitKm) {
     return {
       ok: false,
-      error: `Daily distance cap exceeded (${MAX_DAILY_DISTANCE_KM} km/day).`
+      error: buildDailyDistanceLimitMessage({
+        transportMode: normalizedMode,
+        currentDistanceKm: todayDistance,
+        proposedDistanceKm
+      })
     };
   }
 
@@ -833,7 +844,7 @@ app.post('/api/commute', commuteLimiter, requireAuth, async (req, res) => {
       );
     }
 
-    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, distance);
+    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, transportMode, distance);
     if (!tripGuards.ok) {
       return sendResponse(res, false, null, tripGuards.error, 429);
     }
@@ -940,7 +951,7 @@ app.post('/api/commute/tracked', commuteLimiter, requireAuth, async (req, res) =
       return sendResponse(res, false, null, 'Trip duration exceeds maximum allowed limit', 400);
     }
 
-    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, Number(distance));
+    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, transportMode, Number(distance));
     if (!tripGuards.ok) {
       return sendResponse(res, false, null, tripGuards.error, 429);
     }
@@ -1074,7 +1085,7 @@ app.post('/api/commute/routed', commuteLimiter, requireAuth, async (req, res) =>
       return sendResponse(res, false, null, consumeResult.error, 400);
     }
 
-    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, reportedDistance);
+    const tripGuards = await enforceTripFrequencyAndDailyDistance(userId, transportMode, reportedDistance);
     if (!tripGuards.ok) {
       return sendResponse(res, false, null, tripGuards.error, 429);
     }
@@ -1102,7 +1113,7 @@ app.post('/api/commute/routed', commuteLimiter, requireAuth, async (req, res) =>
       pointsEarned: adjustedPoints,
       validationMethod: 'map_route',
       validationScore,
-      route: route.slice(0, MAX_TRACKED_PATH_POINTS),
+      route: serializeRouteCoordinatesForFirestore(route, MAX_TRACKED_PATH_POINTS),
       startPoint: [Number(startPoint[0]), Number(startPoint[1])],
       endPoint: [Number(endPoint[0]), Number(endPoint[1])],
       routeDistanceKm: Number(routeValidation.routeDistance.toFixed(3)),
