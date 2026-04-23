@@ -1,211 +1,297 @@
-# 🌱 Carbon Gamified - Eco-Friendly Commute Tracker
+# Carbon Tracker
 
-A gamified carbon footprint calculator where users log daily commutes, earn points for eco-friendly choices, and compete on a global leaderboard.
+Carbon Tracker is a gamified commute logging app that helps users record trips, compare transport choices against driving, and build repeat eco-friendly habits through streaks, badges, XP, and leaderboard progress.
 
-## 🚀 Features
+## Current Functionality
 
-- **🔐 Authentication**: Email/password signup and login
-- **🚴 Commute Logger**: Track daily commutes with 6 transport modes
-- **📊 Dashboard**: View personal stats and environmental impact
-- **🏆 Global Leaderboard**: Compete with users worldwide
-- **🌱 Points System**: Earn points based on carbon saved vs driving
-- **📱 Responsive Design**: Mobile-friendly glassmorphic UI
+- Firebase Authentication with email/password and Google sign-in
+- Session establishment through the backend using verified Firebase ID tokens
+- Three commute logging flows:
+  - manual distance entry
+  - map-based route logging with route validation
+  - live GPS tracking
+- Carbon calculations for car, motorcycle, bus, train, bicycle, and walking
+- Dashboard with total points, carbon saved, weekly activity, tree-equivalent style impact, and nudges
+- Gamification layer with streaks, levels, XP, badges, weekly summary, and leaderboard rank
+- Leaderboard with auto-refresh
+- FAQ and shareable profile card experience
 
-## 🛠 Tech Stack
+## Product Notes
 
-### Frontend
-- **React.js** - UI framework
-- **CSS3** - Modern styling with glassmorphism
-- **Axios** - HTTP client for API calls
+- GPS live tracking is included and partially working, but it should still be treated as a demo-stage feature.
+- Manual entry and map-based route logging are the strongest user flows today.
+- Existing stored user XP is not automatically recalculated when XP formulas change; new trips use the latest backend logic.
 
-### Backend
-- **Node.js/Express.js** - REST API server
-- **Firebase Firestore** - NoSQL database
-- **Firebase Admin SDK** - Server-side Firebase integration
-- **bcryptjs** - Password hashing
+## Tech Stack
 
-### Database
-- **Firebase Firestore** - Users, commutes, and leaderboard data
-- **Firebase Authentication** - User management
+- Frontend: React, Create React App, React Router, Axios, Leaflet, React Leaflet, CSS
+- Backend: Node.js, Express, Axios, dotenv, helmet, cors, express-rate-limit
+- Auth and data: Firebase Authentication, Cloud Firestore, Firebase Admin SDK
+- Routing and geocoding: OpenRouteService, Nominatim / OpenStreetMap
+- Deployment: Vercel for the frontend, Render for the backend
 
-## 📋 Project Structure
+## Repository Structure
 
-```
-carbon-gamified-app/
-├── frontend/                 # React frontend
+```text
+.
+├── frontend/
 │   ├── public/
-│   │   └── index.html
 │   ├── src/
+│   │   ├── api/
 │   │   ├── components/
-│   │   │   ├── LoginPage.js
-│   │   │   ├── Dashboard.js
-│   │   │   ├── CommuteLogger.js
-│   │   │   └── Leaderboard.js
+│   │   ├── utils/
 │   │   ├── App.js
-│   │   ├── App.css
-│   │   └── index.js
-│   ├── package.json
-│   └── .env.example
-├── backend/                  # Node.js backend
+│   │   └── firebase.js
+│   ├── .env.example
+│   └── package.json
+├── backend/
 │   ├── server.js
 │   ├── firebase-config.js
+│   ├── gamification-service.js
 │   ├── carbon-calculator.js
-│   ├── package.json
 │   ├── .env.example
-│   └── serviceAccountKey.json.example
-├── .gitignore
+│   └── package.json
+├── firestore.indexes.json
 └── README.md
 ```
 
-## 🚀 Quick Start
+## Local Development
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
-- Firebase project
 
-### 1. Firebase Setup
+- Node.js 18+
+- npm
+- A Firebase project
+- An OpenRouteService API key for route validation
 
-1. Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Firestore Database
-3. Create a service account:
-   - Go to Project Settings → Service Accounts
-   - Click "Generate new private key"
-   - Download the JSON file
-4. Copy the service account key to `backend/serviceAccountKey.json`
+### 1. Install Dependencies
 
-### 2. Backend Setup
+From the repository root:
+
+```bash
+npm run install:all
+```
+
+Or install per app:
+
+```bash
+cd frontend && npm install
+cd ../backend && npm install
+```
+
+### 2. Configure Environment Variables
+
+Copy the example files:
+
+```bash
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+```
+
+#### Frontend Variables
+
+Set these in `frontend/.env`:
+
+- `REACT_APP_API_URL`
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+- `REACT_APP_FIREBASE_APP_ID`
+- `REACT_APP_FIREBASE_MEASUREMENT_ID` if available
+- `REACT_APP_NOMINATIM_EMAIL` or `REACT_APP_CONTACT_EMAIL` optionally
+
+#### Backend Variables
+
+Set these in `backend/.env`:
+
+- `NODE_ENV`
+- `ALLOWED_ORIGINS`
+- `OPENROUTESERVICE_API_KEY`
+- `ROUTE_TOKEN_SECRET` recommended
+- One Firebase Admin credential approach:
+  - `FIREBASE_SERVICE_ACCOUNT_JSON`
+  - or `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+
+Optional backend tuning variables are listed in `backend/.env.example`.
+
+### 3. Firebase Setup
+
+In Firebase Console:
+
+- create or open a Firebase project
+- enable Authentication
+- enable Email/Password if you want email login
+- enable Google if you want Google sign-in
+- enable Firestore
+- create a Web App and copy the client config into the frontend env file
+- create a service account key or use service account env vars for the backend
+- add your frontend domain to Firebase Authentication authorized domains
+
+### 4. Start the Apps
+
+Backend:
 
 ```bash
 cd backend
-npm install
-cp .env.example .env
-# Edit .env with your Firebase credentials
 npm start
 ```
 
-The backend will run on `http://localhost:3001`
-
-### 3. Frontend Setup
+Frontend:
 
 ```bash
 cd frontend
-npm install
-cp .env.example .env
-# Edit .env with your Firebase config
 npm start
 ```
 
-The frontend will run on `http://localhost:3000`
+Or from the repo root:
 
-## 🎮 How to Use
+```bash
+npm run dev
+```
 
-### Demo Account
-Use the demo credentials to quickly test the app:
-- **Email**: demo@test.com
-- **Password**: Demo123!
+Default local URLs:
 
-### Features
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:3001`
 
-1. **Sign Up/Login**: Create an account or use demo credentials
-2. **Log Commute**: 
-   - Select transport mode (Car, Motorcycle, Bus, Train, Bicycle, Walking)
-   - Enter distance in kilometers
-   - View carbon savings and points earned
-3. **Dashboard**: 
-   - View total points and carbon saved
-   - See weekly commute statistics
-   - Check environmental impact in tree equivalents
-4. **Leaderboard**: 
-   - View top 10 global users
-   - See rankings by total points
-   - Auto-refreshes every 5 seconds
+## Current User Flow
 
-## 📊 Carbon Calculation
+1. User signs up or signs in with Firebase Auth.
+2. Frontend exchanges the Firebase identity with the backend through `POST /api/auth/session`.
+3. User logs a commute manually, through a validated map route, or through live GPS tracking.
+4. Backend calculates:
+   - carbon emitted
+   - carbon saved versus driving
+   - points earned
+   - validation score and any validation bonus
+   - XP, streak, badges, and level progress
+5. Dashboard and leaderboard update from Firestore-backed data.
 
-Carbon emission factors (grams CO₂ per km):
-- 🚗 Car: 192g CO₂/km
-- 🏍️ Motorcycle: 84g CO₂/km
-- 🚌 Bus: 89g CO₂/km
-- 🚆 Train: 34g CO₂/km
-- 🚴 Bicycle: 0g CO₂/km
-- 🚶 Walking: 0g CO₂/km
+## Carbon and Reward Logic
 
-**Points Calculation**: `Points = (Carbon Saved vs Car) × 0.1`
+### Carbon Factors
 
-## 🔧 API Endpoints
+- Car: `192 g CO2/km`
+- Motorcycle: `84 g CO2/km`
+- Bus: `89 g CO2/km`
+- Train: `34 g CO2/km`
+- Bicycle: `0 g CO2/km`
+- Walking: `0 g CO2/km`
 
-### Authentication
-- `POST /api/auth/signup` - Create new user
-- `POST /api/auth/login` - User login
+### Base Points
 
-### Commutes
-- `POST /api/commute` - Log a new commute
+Base commute points are calculated from carbon saved versus driving:
 
-### Data
-- `GET /api/user/:userId` - Get user data and stats
-- `GET /api/leaderboard` - Get top 10 users
-- `GET /api/health` - Health check
+```text
+pointsEarned = round(carbonSavedVsCarKg * 50)
+```
 
-## 🎨 Design System
+### XP
 
-### Colors
-- **Primary Gradient**: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
-- **Success Green**: `#51cf66`
-- **Danger Red**: `#ff6b6b`
-- **Gold**: `#ffd700`
+Current XP award logic lives in `backend/gamification-service.js`:
 
-### Effects
-- **Glassmorphism**: `backdrop-filter: blur(10px)`
-- **Shadows**: `0 8px 32px rgba(0,0,0,0.1)`
-- **Transitions**: `all 0.3s ease`
+```text
+commuteXp = min(round(commutePoints * 0.2), 50)
+badgeBonus = min(badgeUnlockCount * 40, 100)
+challengeBonus = min(challengeBonus, 40)
+streakBonus = min(streakBonus, 30)
+totalXp = min(commuteXp + badgeBonus + challengeBonus + streakBonus, 150)
+```
 
-## 🚀 Deployment
+### Current Level Thresholds
 
-### Frontend (Vercel)
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+- Level 1: `0 XP`
+- Level 2: `1000 XP`
+- Level 3: `2500 XP`
+- Level 4: `5500 XP`
+- Level 5: `11500 XP`
 
-### Backend (Replit)
-1. Upload backend files to Replit
-2. Set environment variables in Replit secrets
-3. Start the server
+## API Surface
 
-## 🧪 Testing
+### Active Endpoints
 
-### Manual Testing Checklist
-- [ ] Signup works with new email
-- [ ] Login works with existing account
-- [ ] Cannot login with wrong password
-- [ ] Can log commute with all 6 transport modes
-- [ ] Points calculated correctly
-- [ ] Leaderboard updates after new commute
-- [ ] Dashboard stats are accurate
-- [ ] Weekly data calculated correctly
-- [ ] All tabs navigate properly
-- [ ] Logout clears session
-- [ ] Mobile responsive design
-- [ ] No console errors
+- `GET /api/health`
+- `POST /api/auth/session`
+- `POST /api/commute`
+- `POST /api/commute/tracked`
+- `POST /api/commute/routed`
+- `POST /api/routes/directions`
+- `GET /api/leaderboard`
+- `GET /api/user/:userId`
+- `GET /api/gamification/summary/:userId`
+- `GET /api/gamification/badges/:userId`
 
-## 🤝 Contributing
+### Deprecated Endpoints
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+These still exist in the backend but return deprecated responses and are not used by the frontend:
 
-## 📄 License
+- `POST /api/auth/login`
+- `POST /api/auth/check-user`
+- `POST /api/auth/google-login`
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Deployment
 
-## 🌱 Environmental Impact
+### Frontend on Vercel
 
-This app helps users:
-- Track their carbon footprint
-- Make eco-friendly transport choices
-- Compete to reduce environmental impact
-- Visualize their contribution to sustainability
+- Root Directory: `frontend`
+- Install Command: `npm install`
+- Build Command: `npm run build`
+- Output Directory: `build`
 
-**Remember**: Every small change counts towards a greener future! 🌍
+Required Vercel environment variables:
+
+- `REACT_APP_API_URL`
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+- `REACT_APP_FIREBASE_APP_ID`
+- `REACT_APP_FIREBASE_MEASUREMENT_ID` if available
+
+### Backend on Render
+
+- Root Directory: `backend`
+- Runtime: `Node`
+- Build Command: `npm install`
+- Start Command: `npm start`
+
+Recommended Render environment variables:
+
+- `NODE_ENV=production`
+- `ALLOWED_ORIGINS=<your-vercel-url>`
+- `TRUST_PROXY=1`
+- `OPENROUTESERVICE_API_KEY=<your-key>`
+- `ROUTE_TOKEN_SECRET=<your-random-secret>`
+- `FIREBASE_SERVICE_ACCOUNT_JSON=<full-json>`
+
+## Testing
+
+Backend tests:
+
+```bash
+cd backend
+npm test
+```
+
+Current automated coverage includes:
+
+- gamification and XP calculations
+- weekly summary aggregation
+- streak behavior
+- route serialization
+- trip limit helpers
+- impact-equivalent helpers
+
+## Limitations
+
+- GPS tracking reliability depends on browser permissions, HTTPS, and signal quality.
+- GPS tracking is not yet a production-grade anti-cheat system.
+- Leaderboard and profile reads are optimized for the current project size, not large-scale production traffic.
+- Map route validation depends on third-party routing availability.
+
+## License
+
+MIT
