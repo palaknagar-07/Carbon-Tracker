@@ -119,14 +119,14 @@ const FAQ_ITEMS = [
     category: 'Tracking & Accuracy',
     question: 'Do manual and tracked trips work the same way?',
     answer:
-      'Both can count toward your progress, but tracked or validated trips may be considered more reliable. This can affect validation bonuses and how confidently the trip is scored.'
+      'Both can count toward your progress, but tracked or validated trips are treated as stronger evidence. That can affect validation bonuses and how confidently the trip is scored.'
   },
   {
     id: 'validation-bonuses',
     category: 'Tracking & Accuracy',
     question: 'What are validation bonuses?',
     answer:
-      'Validation bonuses are extra rewards given when a trip is supported by stronger evidence, such as route or GPS data. They help encourage accurate trip logging.'
+      'Validation bonuses are extra rewards given when a trip is supported by stronger evidence, such as route or GPS data. GPS trips can earn different bonus levels depending on validation quality, so the bonus is not always the same on every tracked trip.'
   },
   {
     id: 'badge-not-unlocked',
@@ -161,7 +161,7 @@ const FAQ_ITEMS = [
     category: 'Account & Privacy',
     question: 'Can I use the app without GPS tracking?',
     answer:
-      'Yes. You can still log trips manually. GPS or route validation simply helps improve trip accuracy and may affect rewards.'
+      'Yes. You can still log trips manually. GPS or route validation simply helps improve trip accuracy and may unlock stronger validation bonuses when the recorded trip quality is good.'
   },
   {
     id: 'trip-history',

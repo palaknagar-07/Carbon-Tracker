@@ -1,14 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './TripTracker.css';
-
-const SPEED_LIMITS = {
-  walking: { min: 2, max: 8 },
-  bicycle: { min: 8, max: 30 },
-  motorcycle: { min: 20, max: 120 },
-  car: { min: 15, max: 140 },
-  bus: { min: 15, max: 80 },
-  train: { min: 30, max: 160 }
-};
+import {
+  MAX_ACCEPTABLE_GPS_ACCURACY_METERS,
+  assessGpsPoint
+} from './tripTrackerUtils';
 
 const TripTracker = ({ 
   transportMode, 
@@ -25,10 +20,13 @@ const TripTracker = ({
   const [distance, setDistance] = useState(0);
   const [averageSpeed, setAverageSpeed] = useState(0);
   const [trackingError, setTrackingError] = useState('');
+  const [trackingNotice, setTrackingNotice] = useState('');
   const [watchId, setWatchId] = useState(null);
   const [locationPermission, setLocationPermission] = useState('prompt'); // 'prompt', 'granted', 'denied'
   const [isHttps, setIsHttps] = useState(true);
   const intervalRef = useRef(null);
+  const permissionStatusRef = useRef(null);
+  const permissionCleanupRef = useRef(null);
 
   const clearTrackingSession = useCallback(() => {
     if (watchId) {
@@ -58,50 +56,16 @@ const TripTracker = ({
     return R * c;
   }, []);
 
-  const validateSpeed = useCallback((speed, mode) => {
-    const limits = SPEED_LIMITS[mode] || SPEED_LIMITS.car;
-    return speed >= limits.min && speed <= limits.max;
-  }, []);
-
-  const verifyLocationAccess = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLocationPermission('denied');
-      setTrackingError('GPS is not supported by your browser.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setLocationPermission('granted');
-        setTrackingError('');
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationPermission('denied');
-          setTrackingError('GPS permission denied. Please enable location access in your browser settings.');
-        } else if (error.code === error.TIMEOUT) {
-          setLocationPermission('prompt');
-          setTrackingError('GPS request timed out. Please try again with a better signal.');
-        } else {
-          setLocationPermission('prompt');
-          setTrackingError('GPS position unavailable. Please check device location services and retry.');
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  }, []);
-
   const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
       setTrackingError('GPS is not supported by your device. Please use manual entry or map route instead.');
       return;
     }
 
+    clearTrackingSession();
+
     setTrackingError('');
+    setTrackingNotice('');
     const trackingStartedAt = Date.now();
     setStartTime(trackingStartedAt);
     setTrackingPath([]);
@@ -109,7 +73,7 @@ const TripTracker = ({
     setAverageSpeed(0);
     setElapsedTime(0);
 
-    const watchId = navigator.geolocation.watchPosition(
+    const watchHandle = navigator.geolocation.watchPosition(
       (position) => {
         const newPoint = {
           latitude: position.coords.latitude,
@@ -121,32 +85,45 @@ const TripTracker = ({
 
         setCurrentLocation(newPoint);
         
-        setTrackingPath(prev => {
-          const newPath = [...prev, newPoint];
-          
-          // Calculate distance and speed
-          if (newPath.length > 1) {
-            const lastPoint = newPath[newPath.length - 2];
-            const segmentDistance = calculateDistance(lastPoint, newPoint);
-            const timeDiff = (newPoint.timestamp - lastPoint.timestamp) / 1000; // seconds
-            const speed = timeDiff > 0 ? (segmentDistance / timeDiff) * 3600 : 0; // km/h
+        setTrackingPath((prev) => {
+          const lastAcceptedPoint = prev[prev.length - 1] || null;
+          const assessment = assessGpsPoint({
+            point: newPoint,
+            lastAcceptedPoint,
+            transportMode,
+            calculateDistance
+          });
 
-            // Validate speed
-            if (!validateSpeed(speed, transportMode)) {
-              setTrackingError(`Speed ${speed.toFixed(1)} km/h is unrealistic for ${transportMode}`);
-              return prev; // Don't add this point
+          if (!assessment.accepted) {
+            if (assessment.reason === 'accuracy') {
+              setTrackingNotice(
+                `Waiting for a stronger GPS signal. Current accuracy is ±${Math.round(newPoint.accuracy)}m; tracking resumes automatically below ±${MAX_ACCEPTABLE_GPS_ACCURACY_METERS}m.`
+              );
+            } else if (assessment.reason === 'speed') {
+              setTrackingNotice(
+                'Ignored one unstable GPS reading. Keep moving and tracking will continue once the signal stabilizes.'
+              );
+            } else {
+              setTrackingNotice('Waiting for the next stable GPS reading.');
             }
+            return prev;
+          }
 
+          setTrackingError('');
+          setTrackingNotice('');
+
+          if (lastAcceptedPoint) {
             setDistance((prevDistance) => {
-              const nextDistance = prevDistance + segmentDistance;
+              const nextDistance = prevDistance + assessment.segmentDistanceKm;
               const totalTimeHours = (newPoint.timestamp - trackingStartedAt) / (1000 * 3600);
-              const computedAverageSpeed = totalTimeHours > 0 ? nextDistance / totalTimeHours : speed;
+              const computedAverageSpeed =
+                totalTimeHours > 0 ? nextDistance / totalTimeHours : assessment.speedKmH;
               setAverageSpeed(computedAverageSpeed);
               return nextDistance;
             });
           }
 
-          return newPath;
+          return [...prev, newPoint];
         });
       },
       (error) => {
@@ -175,13 +152,50 @@ const TripTracker = ({
       }
     );
 
-    setWatchId(watchId);
+    setWatchId(watchHandle);
 
     // Update elapsed time
     intervalRef.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - trackingStartedAt) / 1000));
     }, 1000);
-  }, [transportMode, calculateDistance, validateSpeed]);
+  }, [clearTrackingSession, transportMode, calculateDistance]);
+
+  const verifyLocationAccess = useCallback((options = {}) => {
+    const { startOnSuccess = false } = options;
+
+    if (!navigator.geolocation) {
+      setLocationPermission('denied');
+      setTrackingError('GPS is not supported by your browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setLocationPermission('granted');
+        setTrackingError('');
+        if (startOnSuccess) {
+          startTracking();
+        }
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationPermission('denied');
+          setTrackingError('GPS permission denied. Please enable location access in your browser settings.');
+        } else if (error.code === error.TIMEOUT) {
+          setLocationPermission('prompt');
+          setTrackingError('GPS request timed out. Please try again with a better signal.');
+        } else {
+          setLocationPermission('prompt');
+          setTrackingError('GPS position unavailable. Please check device location services and retry.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  }, [startTracking]);
 
   const calculateValidationScore = useCallback(() => {
     let score = 100;
@@ -249,6 +263,7 @@ const TripTracker = ({
   const cancelTracking = useCallback(() => {
     clearTrackingSession();
     setTrackingError('');
+    setTrackingNotice('');
     setTrackingPath([]);
     setDistance(0);
     setAverageSpeed(0);
@@ -264,6 +279,7 @@ const TripTracker = ({
     // Check location permission status when component mounts
     if (navigator.geolocation && navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        permissionStatusRef.current = result;
         if (result.state === 'denied') {
           // Some browsers can report stale denied state; verify actively.
           verifyLocationAccess();
@@ -272,13 +288,15 @@ const TripTracker = ({
         }
         
         // Listen for permission changes
-        result.addEventListener('change', () => {
+        const handlePermissionChange = () => {
           if (result.state === 'denied') {
             verifyLocationAccess();
           } else {
             setLocationPermission(result.state);
           }
-        });
+        };
+        result.addEventListener('change', handlePermissionChange);
+        permissionCleanupRef.current = handlePermissionChange;
       }).catch(() => {
         // Fallback if permissions API is not supported
         setLocationPermission('prompt');
@@ -296,6 +314,12 @@ const TripTracker = ({
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+
+      const permissionStatus = permissionStatusRef.current;
+      const cleanupHandler = permissionCleanupRef.current;
+      if (permissionStatus && cleanupHandler) {
+        permissionStatus.removeEventListener('change', cleanupHandler);
       }
     };
   }, [watchId]);
@@ -338,7 +362,7 @@ const TripTracker = ({
             <p>
               {locationPermission === 'denied' ? 
                 'Location access was denied. No problem! You can still log your trip using manual entry.' :
-                'GPS tracking requires location access to validate your trip and provide the highest points.'}
+                'GPS tracking requires location access to validate your trip and unlock stronger bonuses when trip quality is good.'}
             </p>
             {!isHttps && (
               <div className="https-warning">
@@ -362,10 +386,11 @@ const TripTracker = ({
               <div className="permission-benefits">
                 <h5>Benefits of enabling GPS:</h5>
                 <ul>
-                  <li>50% bonus points for validated trips</li>
+                  <li>Up to 50% bonus points for high-quality validated trips</li>
+                  <li>20% bonus for trips that pass with a good score</li>
                   <li>Real-time trip tracking</li>
                   <li>Automatic distance calculation</li>
-                  <li>Highest validation score (80-100)</li>
+                  <li>Stronger validation confidence when GPS stays stable</li>
                 </ul>
               </div>
             )}
@@ -408,10 +433,10 @@ const TripTracker = ({
                     type="button" 
                     className="btn primary-btn"
                     onClick={() => {
-                      verifyLocationAccess();
+                      verifyLocationAccess({ startOnSuccess: true });
                     }}
                   >
-                    Enable GPS Tracking
+                    Enable GPS and Start Tracking
                   </button>
                 </>
               )}
@@ -490,6 +515,12 @@ const TripTracker = ({
         </div>
       )}
 
+      {trackingNotice ? (
+        <div className="tracker-notice">
+          <p>{trackingNotice}</p>
+        </div>
+      ) : null}
+
       <div className="tracker-controls">
         {!watchId ? (
           <button 
@@ -519,6 +550,12 @@ const TripTracker = ({
           </>
         )}
       </div>
+
+      {watchId && trackingPath.length < 2 ? (
+        <div className="tracker-hint">
+          Waiting for at least two stable GPS points before you can end the trip.
+        </div>
+      ) : null}
 
       {trackingPath.length > 1 && (
         <div className="tracking-progress">

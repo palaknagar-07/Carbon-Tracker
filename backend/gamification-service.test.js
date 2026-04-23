@@ -50,7 +50,24 @@ test('aggregateWeeklyStats never reports more weekly XP than total XP earned', (
     { carbonSavedVsCar: 1.1, pointsEarned: 12000 }
   ], 300);
 
-  assert.equal(result.weekXp, 300);
+  assert.equal(result.weekXp, 100);
+});
+
+test('awardXP uses the reduced commute, badge, challenge, and streak caps', () => {
+  const xp = awardXP({
+    commutePoints: 400,
+    badgeUnlockCount: 5,
+    challengeBonus: 200,
+    streakBonus: 80
+  });
+
+  assert.deepEqual(xp, {
+    commuteXp: 50,
+    badgeBonus: 100,
+    challengeBonus: 40,
+    streakBonus: 30,
+    totalXp: 150
+  });
 });
 
 test('calculateLevelProgress is proportional to completed levels', () => {

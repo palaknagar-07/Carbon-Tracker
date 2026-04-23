@@ -10,7 +10,7 @@ const LEVELS = [
 ];
 
 const STREAK_MILESTONES = { 7: 80, 30: 220, 60: 420, 100: 800 };
-const BADGE_UNLOCK_BONUS_XP = 120;
+const BADGE_UNLOCK_BONUS_XP = 40;
 
 const BADGE_DEFINITIONS = [
   { id: 'streak_3', title: '3 Day Green Start', description: 'Maintain a 3-day commute streak.', icon: '🔥', category: 'streak', condition: { type: 'streakDays', value: 3 } },
@@ -188,17 +188,23 @@ function checkBadgeUnlocks(context, unlockedIdsSet) {
 }
 
 function awardXP({ commutePoints, challengeBonus = 0, streakBonus = 0, badgeUnlockCount = 0 }) {
-  const commuteXp = Math.round(Math.max(0, Number(commutePoints) || 0));
-  const badgeBonus = Math.min(badgeUnlockCount * BADGE_UNLOCK_BONUS_XP, 500); // Cap badge bonus at 500 XP
-  const challengeBonusCapped = Math.min(Math.max(0, Number(challengeBonus) || 0), 200); // Cap challenge bonus at 200 XP
-  const streakBonusCapped = Math.min(Math.max(0, Number(streakBonus) || 0), 100); // Cap streak bonus at 100 XP
-  const totalXp = Math.min(commuteXp + challengeBonusCapped + streakBonusCapped + badgeBonus, 1000); // Cap total XP per commute at 1000
-  return { 
-    commuteXp, 
-    streakBonus: streakBonusCapped, 
-    challengeBonus: challengeBonusCapped, 
-    badgeBonus, 
-    totalXp 
+  const commuteXp = Math.min(Math.round(Math.max(0, Number(commutePoints) || 0) * 0.2), 50);
+  const badgeBonus = Math.min(
+    Math.max(0, Number(badgeUnlockCount) || 0) * BADGE_UNLOCK_BONUS_XP,
+    100
+  );
+  const challengeBonusCapped = Math.min(Math.max(0, Number(challengeBonus) || 0), 40);
+  const streakBonusCapped = Math.min(Math.max(0, Number(streakBonus) || 0), 30);
+  const totalXp = Math.min(
+    commuteXp + challengeBonusCapped + streakBonusCapped + badgeBonus,
+    150
+  );
+  return {
+    commuteXp,
+    streakBonus: streakBonusCapped,
+    challengeBonus: challengeBonusCapped,
+    badgeBonus,
+    totalXp
   };
 }
 

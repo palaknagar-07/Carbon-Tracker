@@ -973,6 +973,17 @@ app.post('/api/commute/tracked', commuteLimiter, requireAuth, async (req, res) =
       return sendResponse(res, false, null, 'Valid GPS path is required', 400);
     }
 
+    const sanitizedPath = sanitizeTrackedPath(path);
+    if (sanitizedPath.length < 2) {
+      return sendResponse(
+        res,
+        false,
+        null,
+        'GPS signal was too weak to validate this trip. Wait for a stronger location signal and try again.',
+        400
+      );
+    }
+
     const startMs = Number(startTime);
     const endMs = Number(endTime);
     const nowMs = Date.now();
@@ -997,13 +1008,19 @@ app.post('/api/commute/tracked', commuteLimiter, requireAuth, async (req, res) =
     }
 
     // Validate GPS data
-    const validationResults = validateTripData(path, transportMode, distance, duration, averageSpeed);
+    const validationResults = validateTripData(
+      sanitizedPath,
+      transportMode,
+      distance,
+      duration,
+      averageSpeed
+    );
     
     if (!validationResults.isValid) {
       return sendResponse(res, false, null, validationResults.error, 400);
     }
 
-    const computedValidationScore = calculateGpsValidationScore(path, transportMode);
+    const computedValidationScore = calculateGpsValidationScore(sanitizedPath, transportMode);
     const carbonCalculation = calculateCarbon(transportMode, distance);
 
     // Bonus points for validated trips
@@ -1023,7 +1040,7 @@ app.post('/api/commute/tracked', commuteLimiter, requireAuth, async (req, res) =
       validationScore: computedValidationScore,
       duration,
       averageSpeed,
-      path: path.slice(0, MAX_TRACKED_PATH_POINTS), // Limit stored points to save storage
+      path: sanitizedPath.slice(0, MAX_TRACKED_PATH_POINTS), // Limit stored points to save storage
       startTime: admin.firestore.Timestamp.fromMillis(startMs),
       endTime: admin.firestore.Timestamp.fromMillis(endMs),
       timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -1367,6 +1384,40 @@ function calculateDistanceFromCoords(point1, point2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+function sanitizeTrackedPath(path = []) {
+  if (!Array.isArray(path)) return [];
+
+  const sanitized = [];
+  for (let i = 0; i < path.length; i += 1) {
+    const point = path[i] || {};
+    const normalizedPoint = {
+      latitude: Number(point.latitude),
+      longitude: Number(point.longitude),
+      accuracy: Number(point.accuracy),
+      timestamp: Number(point.timestamp)
+    };
+
+    if (
+      !isValidLatLon(normalizedPoint.latitude, normalizedPoint.longitude) ||
+      !isFiniteNumber(normalizedPoint.accuracy) ||
+      !isFiniteNumber(normalizedPoint.timestamp) ||
+      normalizedPoint.accuracy <= 0 ||
+      normalizedPoint.accuracy > 50
+    ) {
+      continue;
+    }
+
+    const previous = sanitized[sanitized.length - 1];
+    if (previous && normalizedPoint.timestamp <= previous.timestamp) {
+      continue;
+    }
+
+    sanitized.push(normalizedPoint);
+  }
+
+  return sanitized;
 }
 
 function calculateRouteDistanceKmFromCoordinates(routeCoords) {

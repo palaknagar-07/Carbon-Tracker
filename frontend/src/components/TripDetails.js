@@ -128,7 +128,7 @@ const TripDetails = ({ tripData, onBack, transportMode, distance, userStats, onN
               {tripData.validationMethod === 'manual' && (
                 <p className="validation-method">
                   <span className="method-badge manual">Manual Entry</span>
-                  Self-reported distance. Enable GPS tracking for validation bonuses.
+                  Self-reported distance. GPS tracking can unlock stronger validation bonuses when trip quality is good.
                 </p>
               )}
               {tripData.validationMethod === 'map_route' && (
